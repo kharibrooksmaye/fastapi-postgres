@@ -1,5 +1,6 @@
 [
   {
+    "id": 1,
     "title": "Their Eyes Were Watching God",
     "author": "Zora Neale Hurston",
     "published_year": 1937,
@@ -9,6 +10,7 @@
     "is_checked_out": false
   },
   {
+    "id": 2,
     "title": "Invisible Man",
     "author": "Ralph Ellison",
     "published_year": 1952,
@@ -18,6 +20,7 @@
     "is_checked_out": false
   },
   {
+    "id": 3,
     "title": "Native Son",
     "author": "Richard Wright",
     "published_year": 1940,
@@ -27,6 +30,7 @@
     "is_checked_out": false
   },
   {
+    "id": 4,
     "title": "Go Tell It on the Mountain",
     "author": "James Baldwin",
     "published_year": 1953,
@@ -36,6 +40,7 @@
     "is_checked_out": false
   },
   {
+    "id": 5,
     "title": "The Souls of Black Folk",
     "author": "W. E. B. Du Bois",
     "published_year": 1903,
@@ -45,6 +50,7 @@
     "is_checked_out": false
   },
   {
+    "id": 6,
     "title": "Beloved",
     "author": "Toni Morrison",
     "published_year": 1987,
@@ -54,6 +60,7 @@
     "is_checked_out": false
   },
   {
+    "id": 7,
     "title": "The Color Purple",
     "author": "Alice Walker",
     "published_year": 1982,
@@ -63,6 +70,7 @@
     "is_checked_out": false
   },
   {
+    "id": 8,
     "title": "Between the World and Me",
     "author": "Ta-Nehisi Coates",
     "published_year": 2015,
@@ -72,6 +80,7 @@
     "is_checked_out": false
   },
   {
+    "id": 9,
     "title": "I Know Why the Caged Bird Sings",
     "author": "Maya Angelou",
     "published_year": 1969,
@@ -81,6 +90,7 @@
     "is_checked_out": false
   },
   {
+    "id": 10,
     "title": "The Autobiography of Malcolm X",
     "author": "Malcolm X and Alex Haley",
     "published_year": 1965,
