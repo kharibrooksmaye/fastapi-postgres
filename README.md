@@ -1,4 +1,4 @@
-# FastAPI + PostgreSQL
+# FastAPI + PostgreSQL Library App Backend
 
 A starter project for building RESTful APIs using [FastAPI](https://fastapi.tiangolo.com/) and [PostgreSQL](https://www.postgresql.org/).
 
