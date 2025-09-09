@@ -16,6 +16,29 @@ A starter project for building RESTful APIs using [FastAPI](https://fastapi.tian
 - Caching
 - Docker
 
+### App Structure
+
+```
+fastapi-postgres/
+├── .gitattributes
+├── .gitignore
+├── README.md
+└── app/
+    ├── __init__.py
+    ├── main.py
+    ├── test_main.py
+    ├── mocks/
+    └── src/
+        ├── routes/
+        │   ├── __init__.py
+        │   ├── items.py
+        │   └── users.py
+        └── schema/
+            ├── __init__.py
+            ├── items.py
+            └── users.py
+```
+
 ## Getting Started
 
 ### Prerequisites
@@ -62,22 +85,6 @@ The API will be available at [http://localhost:8000](http://localhost:8000).
 
 ```bash
 docker-compose up --build
-```
-
-## Project Structure
-
-```
-fastapi-postgres/
-├── app/
-│   ├── main.py
-│   ├── models/
-│   ├── schemas/
-│   ├── api/
-│   └── db/
-├── tests/
-├── requirements.txt
-├── Dockerfile
-└── docker-compose.yml
 ```
 
 ## License
