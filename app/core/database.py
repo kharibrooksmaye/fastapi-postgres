@@ -1,5 +1,5 @@
 from typing import Annotated, AsyncIterator
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import sessionmaker

@@ -1,5 +1,7 @@
 [
   {
+    "id": 1,
+    "type": "patron",
     "name": "Alice Johnson",
     "email": "alice.johnson@example.com",
     "member_id": 1,
@@ -8,6 +10,8 @@
     "is_active": true
   },
   {
+    "id": 2,
+    "type": "librarian",
     "name": "Bob Smith",
     "email": "bob.smith@example.com",
     "member_id": 2,
@@ -16,6 +20,8 @@
     "is_active": true
   },
   {
+    "id": 3,
+    "type": "patron",
     "name": "Carol Lee",
     "email": "carol.lee@example.com",
     "member_id": 3,
@@ -24,6 +30,8 @@
     "is_active": false
   },
   {
+    "id": 4,
+    "type": "admin",
     "name": "David Kim",
     "email": "david.kim@example.com",
     "member_id": 4,
@@ -32,6 +40,8 @@
     "is_active": true
   },
   {
+    "id": 5,
+    "type": "patron",
     "name": "Eva Martinez",
     "email": "eva.martinez@example.com",
     "member_id": 5,
@@ -40,6 +50,8 @@
     "is_active": true
   },
   {
+    "id": 6,
+    "type": "librarian",
     "name": "Frank Wright",
     "email": "frank.wright@example.com",
     "member_id": 6,
@@ -48,6 +60,8 @@
     "is_active": false
   },
   {
+    "id": 7,
+    "type": "patron",
     "name": "Grace Chen",
     "email": "grace.chen@example.com",
     "member_id": 7,
@@ -56,6 +70,8 @@
     "is_active": true
   },
   {
+    "id": 8,
+    "type": "admin",
     "name": "Henry Patel",
     "email": "henry.patel@example.com",
     "member_id": 8,
@@ -64,6 +80,8 @@
     "is_active": false
   },
   {
+    "id": 9,
+    "type": "patron",
     "name": "Isabel Gomez",
     "email": "isabel.gomez@example.com",
     "member_id": 9,
@@ -72,6 +90,8 @@
     "is_active": true
   },
   {
+    "id": 10,
+    "type": "librarian",
     "name": "Jack Wilson",
     "email": "jack.wilson@example.com",
     "member_id": 10,
