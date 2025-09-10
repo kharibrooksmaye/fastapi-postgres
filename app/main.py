@@ -5,13 +5,13 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from app.src.routes import items, users
-from app.core.database import create_db_and_tables
+from app.core.database import init_db
 
 
 
 
 async def startup():
-    create_db_and_tables()
+    await init_db()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

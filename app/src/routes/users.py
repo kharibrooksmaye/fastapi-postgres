@@ -2,8 +2,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 
+from app.core.database import SessionDep
 from app.mocks.mock_data import mock_patrons
-from app.src.schema.users import User as Patron
+from app.src.models.users import User as Patron
 
 router = APIRouter()
 
@@ -29,10 +30,13 @@ async def get_patron(patron_id: int, token: Annotated[str, Depends(oauth2_scheme
     return {"token": token, "patron": patron}
 
 @router.post("/")
-async def create_patron(patron: Patron, token: Annotated[str, Depends(oauth2_scheme)]):
+async def create_patron(patron: Patron, token: Annotated[str, Depends(oauth2_scheme)], session: SessionDep):
     patron_dict = patron.model_dump()
+    session.add(patron)
+    await session.commit()
+    await session.refresh(patron)
     message = f"Patron '{patron.name}' with member ID {patron.member_id} created successfully."
-    return {"message": message, "patron": patron_dict, "token": token}
+    return {"message": message, "patron": patron, "token": token}
 
 
 @router.post("/{patron_id}/checkout/")
