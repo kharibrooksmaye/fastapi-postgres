@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 
 from app.mocks.mock_data import mock_patrons
-from app.src.schema.users import Patron
+from app.src.schema.users import User as Patron
 
 router = APIRouter()
 

@@ -2,6 +2,8 @@ from typing import Union
 from pydantic import BaseModel
 
 class Book(BaseModel):
+    id: int 
+    type: str = "book"
     title: str
     author: str
     published_year: int

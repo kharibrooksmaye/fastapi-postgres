@@ -2,7 +2,7 @@ from typing import Union
 from pydantic import BaseModel
 
 
-class Patron(BaseModel):
+class User(BaseModel):
     name: str
     email: str
     member_id: int
