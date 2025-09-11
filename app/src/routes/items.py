@@ -1,54 +1,64 @@
 from typing import Union
 from fastapi import APIRouter, HTTPException
+from sqlmodel import select
 
 import app
-from app.mocks.mock_data import mock_books
-from app.src.models.items import Book
+from app.mocks.mock_data import mock_items
+from app.src.models.items import Item
 from app.core.database import SessionDep
 
 router = APIRouter()
+@router.get("/{item}s")
+async def get_items(item: str, session: SessionDep):
+    print(item)
+    if item:
+        result = await session.exec(select(Item).where(Item.type == item))
+        items = result.all()
+    return items
 
-@router.get("/books/")
-async def get_books():
-    return {"books": mock_books}
 
-@router.get("/books/{book_id}")
-async def get_book(book_id: int, q: Union[str, None] = None):
-    book = next((book for book in mock_books if book["id"] == book_id), None)
-    return {"book": book, "q": q}
+@router.get("/{item}s/{item_id}")
+async def get_item(item: str, item_id: int, session: SessionDep, q: Union[str, None] = None):
+    print(item, item_id)
+    db_item = await session.get(Item, item_id)
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return db_item
 
-@router.post("/books/")
-async def create_book(book: Book, session: SessionDep) -> Book:
-    book_dict = book.model_dump()
-    last_name = book.author.split(" ")[1]
-    complete_call_number = f"{book.call_number} {last_name}"
-    book_dict.update({"complete_call_number": complete_call_number})
-    
-    session.add(book)
+@router.post("/{item}s/")
+async def create_item(item: str, body_item: Item, session: SessionDep) -> Item:
+    item_dict = body_item.model_dump()
+    last_name = body_item.author.split(" ")[1]
+    complete_call_number = f"{body_item.call_number} {last_name}"
+    item_dict.update({"complete_call_number": complete_call_number})
+
+    session.add(body_item)
     await session.commit()
-    await session.refresh(book)
-    return book
+    await session.refresh(body_item)
+    return body_item
 
-@router.put("/books/{book_id}")
-async def update_book(book_id: int, book: Book, session: SessionDep):
-    db_book = await session.get(Book, book_id)
-    if not db_book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    book_dict = book.model_dump()
-    last_name = book.author.split(" ")[1]
-    complete_call_number = f"{book.call_number} {last_name}"
-    book_dict.update({"complete_call_number": complete_call_number})
-    for key, value in book_dict.items():
-        setattr(db_book, key, value)
+@router.put("/{item}s/{item_id}")
+async def update_item(item: str, item_id: int, body_item: Item, session: SessionDep):
+    db_item = await session.get(Item, item_id)
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    item_dict = body_item.model_dump()
+    last_name = body_item.author.split(" ")[1]
+    complete_call_number = f"{body_item.call_number} {last_name}"
+    item_dict.update({"complete_call_number": complete_call_number})
+    for key, value in item_dict.items():
+        setattr(db_item, key, value)
     await session.commit()
-    await session.refresh(db_book)
-    return db_book
+    await session.refresh(db_item)
+    return db_item
 
-@router.delete("/books/{book_id}")
-async def delete_book(book_id: int, session: SessionDep):
-    db_book = await session.get(Book, book_id)
-    if not db_book:
-        raise HTTPException(status_code=404, detail="Book not found")
-    await session.delete(db_book)
+@router.delete("/{item}s/{item_id}")
+async def delete_item(item: str, item_id: int, session: SessionDep):
+    db_item = await session.get(Item, item_id)
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    await session.delete(db_item)
     await session.commit()
-    return {"book_id": book_id, "status": "deleted"}
+    return {"item_id": item_id, "status": "deleted"}
+
+

@@ -1,23 +1,29 @@
 from contextlib import asynccontextmanager
+
 from functools import lru_cache
 from typing import Union
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from app.core.database import SessionDep, get_session, session_context
+from app.mocks.mock_data import seed_database
 from app.src.routes import items, users
 from app.core.database import init_db
 
 
 
-
-async def startup():
+async def startup() -> SessionDep:
     await init_db()
+    async with session_context() as session:
+        print("Seeding database with mock data...")
+        await seed_database(session)
+        print("Database seeding completed successfully!")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup code
     print("Starting up...")
-    await startup()
+    session = await startup()
     print("DB connected")
     yield
     # Shutdown code

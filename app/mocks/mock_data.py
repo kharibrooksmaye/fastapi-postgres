@@ -6,18 +6,18 @@ from sqlmodel import select
 # Import models
 import sys
 sys.path.append(str(Path(__file__).parent.parent))
-from src.models.items import Item
-from src.models.users import User
+from app.src.models.items import Item
+from app.src.models.users import User
 
-# Adjust the path as needed; this assumes mock_books.json is in the same directory as this file
+# Adjust the path as needed; this assumes mock_items.json is in the same directory as this file
 item_path = Path(__file__).parent / "mock_items.json"
-patron_path = Path(__file__).parent / "mock_patrons.json"
+user_path = Path(__file__).parent / "mock_users.json"
 
 with open(item_path, "r") as f:
     mock_items = json.load(f)
 
-with open(patron_path, "r") as f:
-    mock_patrons = json.load(f)
+with open(user_path, "r") as f:
+    mock_users = json.load(f)
 
 async def seed_database(session: AsyncSession):
     """
@@ -51,7 +51,7 @@ async def seed_database(session: AsyncSession):
         print("Users already exist in database, skipping user seeding...")
     else:
         # Seed users (patrons)
-        for patron_data in mock_patrons:
+        for patron_data in mock_users:
             # Create user from patron data
             user = User(
                 type=patron_data.get("type", "patron"),
@@ -65,4 +65,4 @@ async def seed_database(session: AsyncSession):
             session.add(user)
         
         await session.commit()
-        print(f"Successfully seeded {len(mock_patrons)} users")
+        print(f"Successfully seeded {len(mock_users)} users")
