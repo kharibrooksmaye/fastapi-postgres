@@ -1,14 +1,12 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
 
 from app.core.database import SessionDep
+from app.core.security import get_current_user, oauth2_scheme
 from app.mocks.mock_data import mock_users
 from app.src.models.users import User
 
 router = APIRouter()
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 async def common_parameters(q: str | None = None, skip: int = 0, limit: int = 100):
     return { "q": q, "skip": skip, "limit": limit }
@@ -19,8 +17,9 @@ async def get_users(token: Annotated[str, Depends(oauth2_scheme)], params: Commo
     return {"token": token, "users": mock_users, **params}
 
 @router.get("/me/")
-async def get_my_info(token: Annotated[str, Depends(oauth2_scheme)]):
-    return {"token": token, "user": mock_users[0]}  # Just an example, replace with actual user info
+async def get_my_info(current_user: Annotated[User, Depends(get_current_user)]):
+    print(current_user)
+    return current_user
 
 @router.get("/{user_id}")
 async def get_user(user_id: int, token: Annotated[str, Depends(oauth2_scheme)]):

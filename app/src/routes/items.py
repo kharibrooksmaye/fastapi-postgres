@@ -1,13 +1,21 @@
-from typing import Union
-from fastapi import APIRouter, HTTPException
+from typing import Annotated, Union
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
 
 import app
 from app.mocks.mock_data import mock_items
 from app.src.models.items import Item
 from app.core.database import SessionDep
+from app.core.security import oauth2_scheme
 
 router = APIRouter()
+
+@router.get("/")
+async def read_root(token: Annotated[str, Depends(oauth2_scheme)], session: SessionDep):
+    result = await session.exec(select(Item))
+    items = result.all()
+    return items
+    
 @router.get("/{item}s")
 async def get_items(item: str, session: SessionDep):
     print(item)
