@@ -16,3 +16,4 @@ class User(BaseModel):
     phone_number: Union[str, None] = None
     address: Union[str, None] = None
     is_active: Union[bool, None] = None
+    username: str

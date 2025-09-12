@@ -7,7 +7,9 @@
     "member_id": 1,
     "phone_number": "555-1234",
     "address": "123 Maple St, Springfield",
-    "is_active": true
+    "is_active": true,
+    "username": "alice.johnson",
+    "password": "password1"
   },
   {
     "id": 2,
@@ -17,7 +19,9 @@
     "member_id": 2,
     "phone_number": "555-5678",
     "address": "456 Oak Ave, Springfield",
-    "is_active": true
+    "is_active": true,
+    "username": "bob.smith",
+    "password": "password2"
   },
   {
     "id": 3,
@@ -27,7 +31,9 @@
     "member_id": 3,
     "phone_number": "555-8765",
     "address": "789 Pine Rd, Springfield",
-    "is_active": false
+    "is_active": false,
+    "username": "carol.lee",
+    "password": "password3"
   },
   {
     "id": 4,
@@ -37,7 +43,9 @@
     "member_id": 4,
     "phone_number": null,
     "address": "321 Birch Blvd, Springfield",
-    "is_active": true
+    "is_active": true,
+    "username": "david.kim",
+    "password": "password4"
   },
   {
     "id": 5,
@@ -47,7 +55,9 @@
     "member_id": 5,
     "phone_number": "555-4321",
     "address": null,
-    "is_active": true
+    "is_active": true,
+    "username": "eva.martinez",
+    "password": "password5"
   },
   {
     "id": 6,
@@ -57,7 +67,9 @@
     "member_id": 6,
     "phone_number": null,
     "address": null,
-    "is_active": false
+    "is_active": false,
+    "username": "frank.wright",
+    "password": "password6"
   },
   {
     "id": 7,
@@ -67,7 +79,9 @@
     "member_id": 7,
     "phone_number": "555-2468",
     "address": "654 Cedar St, Springfield",
-    "is_active": true
+    "is_active": true,
+    "username": "grace.chen",
+    "password": "password7"
   },
   {
     "id": 8,
@@ -77,7 +91,9 @@
     "member_id": 8,
     "phone_number": "555-1357",
     "address": "987 Elm St, Springfield",
-    "is_active": false
+    "is_active": false,
+    "username": "henry.patel",
+    "password": "password8"
   },
   {
     "id": 9,
@@ -87,7 +103,9 @@
     "member_id": 9,
     "phone_number": null,
     "address": "159 Spruce Ln, Springfield",
-    "is_active": true
+    "is_active": true,
+    "username": "isabel.gomez",
+    "password": "password9"
   },
   {
     "id": 10,
@@ -97,6 +115,8 @@
     "member_id": 10,
     "phone_number": "555-9753",
     "address": null,
-    "is_active": true
+    "is_active": true,
+    "username": "jack.wilson",
+    "password": "password10"
   }
 ]

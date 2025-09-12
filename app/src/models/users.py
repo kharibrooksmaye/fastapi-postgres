@@ -10,3 +10,6 @@ class User(SQLModel, table=True):
     phone_number: str | None = None
     address: str | None = None
     is_active: bool = Field(default=False)
+    username: str = Field(index=True)
+    password: str
+    

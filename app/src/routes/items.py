@@ -2,11 +2,10 @@ from typing import Annotated, Union
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
 
-import app
 from app.mocks.mock_data import mock_items
 from app.src.models.items import Item
 from app.core.database import SessionDep
-from app.core.security import oauth2_scheme
+from app.core.authentication import oauth2_scheme
 
 router = APIRouter()
 

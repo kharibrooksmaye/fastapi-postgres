@@ -60,7 +60,9 @@ async def seed_database(session: AsyncSession):
                 member_id=patron_data["member_id"],
                 phone_number=patron_data.get("phone_number"),
                 address=patron_data.get("address"),
-                is_active=patron_data["is_active"]
+                is_active=patron_data["is_active"],
+                username=patron_data["username"],
+                password=patron_data["password"]
             )
             session.add(user)
         
