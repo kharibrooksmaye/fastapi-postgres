@@ -6,6 +6,7 @@ from sqlmodel import select
 # Import models
 import sys
 sys.path.append(str(Path(__file__).parent.parent))
+from app.core.authentication import get_password_hash
 from app.src.models.items import Item
 from app.src.models.users import User
 
@@ -62,7 +63,7 @@ async def seed_database(session: AsyncSession):
                 address=patron_data.get("address"),
                 is_active=patron_data["is_active"],
                 username=patron_data["username"],
-                password=patron_data["password"]
+                password=get_password_hash(patron_data["password"])
             )
             session.add(user)
         

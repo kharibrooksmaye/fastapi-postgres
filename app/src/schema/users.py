@@ -8,12 +8,18 @@ class UserTypeEnum(str, Enum):
     admin = "admin"
 
 class User(BaseModel):
-    id: int
+    id: Union[int, None] = None
     type: UserTypeEnum = UserTypeEnum.patron
     name: str
-    email: str
-    member_id: int
+    email: Union[str, None] = None
+    member_id: Union[int, None] = None
     phone_number: Union[str, None] = None
     address: Union[str, None] = None
     is_active: Union[bool, None] = None
     username: str
+    password: str
+    
+class ActivateUserRequest(BaseModel):
+    email: Union[str, None] = None
+    phone_number: Union[str, None] = None
+    username: Union[str, None] = None

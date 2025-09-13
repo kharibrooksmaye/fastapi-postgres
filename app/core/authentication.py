@@ -21,7 +21,8 @@ def verify_password(plain_password: str, hashed_password: str):
     return pwd_context.verify(plain_password, hashed_password)
 
 async def get_user(db: Session, username: str):
-    user = await db.exec(select(User).where(User.username == username)).first()
+    result = await db.exec(select(User).where(User.username == username))
+    user = result.first()
     return user
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -58,8 +59,3 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Se
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found", headers={"WWW-Authenticate": "Bearer"})
     return user
-
-async def get_current_active_user(current_user: Annotated[User, Depends(get_current_user)]):
-    if current_user.is_active is False:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user", headers={"WWW-Authenticate": "Bearer"})
-    return current_user
