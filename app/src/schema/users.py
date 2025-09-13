@@ -2,10 +2,12 @@ from enum import Enum
 from typing import Union
 from pydantic import BaseModel
 
+
 class UserTypeEnum(str, Enum):
     patron = "patron"
     librarian = "librarian"
     admin = "admin"
+
 
 class User(BaseModel):
     id: Union[int, None] = None
@@ -18,7 +20,8 @@ class User(BaseModel):
     is_active: Union[bool, None] = None
     username: str
     password: str
-    
+
+
 class ActivateUserRequest(BaseModel):
     email: Union[str, None] = None
     phone_number: Union[str, None] = None

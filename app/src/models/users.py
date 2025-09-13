@@ -13,4 +13,3 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=False)
     username: str = Field(index=True)
     password: str
-    
