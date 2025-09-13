@@ -1,5 +1,6 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import select
 
 from app.core.database import SessionDep
 from app.core.authentication import get_current_user, oauth2_scheme
@@ -13,18 +14,21 @@ async def common_parameters(q: str | None = None, skip: int = 0, limit: int = 10
 
 CommonsDependencies = Annotated[dict, Depends(common_parameters)]
 @router.get("/")
-async def get_users(token: Annotated[str, Depends(oauth2_scheme)], params: CommonsDependencies):
-    return {"token": token, "users": mock_users, **params}
+async def get_users(token: Annotated[str, Depends(oauth2_scheme)], params: CommonsDependencies, session: SessionDep):
+    result = await session.exec(select(User).offset(params['skip']).limit(params['limit']))
+    users = result.all()
+    return {"token": token, "users": users, **params}
 
 @router.get("/me/")
 async def get_my_info(current_user: Annotated[User, Depends(get_current_user)]):
     return current_user
 
 @router.get("/{user_id}")
-async def get_user(user_id: int, token: Annotated[str, Depends(oauth2_scheme)]):
-    if user_id not in [u["member_id"] for u in mock_users]:
+async def get_user(user_id: int, token: Annotated[str, Depends(oauth2_scheme)], session: SessionDep):
+    result = await session.exec(select(User).where(User.member_id == user_id))
+    user = result.first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    user = next((u for u in mock_users if u["member_id"] == user_id), None)
     return {"token": token, "user": user}
 
 @router.post("/")
