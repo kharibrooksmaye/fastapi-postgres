@@ -5,14 +5,13 @@ from sqlmodel import select
 from app.core.authorization import require_roles
 from app.src.models.items import Item
 from app.core.database import SessionDep
-from app.core.authentication import oauth2_scheme
 from app.src.models.users import User
 
 router = APIRouter()
 
 
 @router.get("/")
-async def read_root(token: Annotated[str, Depends(oauth2_scheme)], session: SessionDep):
+async def read_root(session: SessionDep):
     result = await session.exec(select(Item))
     items = result.all()
     return items
