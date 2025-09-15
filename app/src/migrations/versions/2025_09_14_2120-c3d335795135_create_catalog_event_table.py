@@ -26,11 +26,10 @@ def upgrade() -> None:
     sa.Column('action', sa.Enum('check_out', 'reserve', 'renew', 'return', name='catalogactionsenum'), nullable=False),
     sa.Column('event_timestamp', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('user', sa.Integer(), nullable=True),
-    sa.Column('catalog_id', sa.Integer(), nullable=True),
+    sa.Column('catalog_ids', sa.ARRAY(sa.Integer()), nullable=True),
     sa.Column('admin_id', sa.Integer(), nullable=False),
     sa.Column('due_date', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.ForeignKeyConstraint(['admin_id'], ['user.id'], ),
-    sa.ForeignKeyConstraint(['catalog_id'], ['item.id'], ),
     sa.ForeignKeyConstraint(['user'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )

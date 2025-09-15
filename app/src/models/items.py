@@ -1,3 +1,5 @@
+from typing import List
+from sqlalchemy import ARRAY, Column, Integer
 from sqlmodel import Field, SQLModel
 
 
@@ -24,3 +26,6 @@ class Item(SQLModel, table=True):
     genre: str | None = Field(default=None, index=True)
     summary: str | None = Field(default=None, index=True)
     is_checked_out: bool = Field(default=False)
+    catalog_events: List[int] = Field(
+        sa_column=Column(ARRAY(Integer), nullable=True)
+    )

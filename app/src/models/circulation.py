@@ -1,5 +1,6 @@
 import datetime
-from sqlalchemy import TIMESTAMP, Column, true
+from typing import List
+from sqlalchemy import TIMESTAMP, Column, true, ARRAY, Integer
 from sqlmodel import Field, SQLModel
 
 from app.src.schema.circulation import CatalogActionsEnum
@@ -12,7 +13,9 @@ class CatalogEvent(SQLModel, table=True):
         sa_column=Column(TIMESTAMP(timezone=true), nullable=False)
     )
     user: int = Field(default=None, foreign_key="user.id")
-    catalog_id: int = Field(default=None, foreign_key="item.id")
+    catalog_ids: List[int] = Field(
+        sa_column=Column(ARRAY(Integer), nullable=True)
+    )
     admin_id: int = Field(foreign_key="user.id")
     due_date: datetime.date = Field(
         sa_column=Column(TIMESTAMP(timezone=true), nullable=False)
