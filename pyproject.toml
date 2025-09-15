@@ -7,7 +7,7 @@ readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.13"
 asyncpg = "^0.30.0"
 python-jose = "^3.3.0"
 passlib = "^1.7.4"
@@ -19,6 +19,8 @@ pydantic-settings = "^2.10.1"
 python-multipart = "^0.0.20"
 greenlet = "^3.2.4"
 bcrypt = "^4.3.0"
+alembic = {extras = ["tz"], version = "^1.16.5"}
+tzdata = "^2025.2"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.database import SessionDep, session_context
 from app.mocks.mock_data import seed_database
-from app.src.routes import auth, items, users
+from app.src.routes import auth, circulation, items, users
 from app.core.database import init_db
 
 origins = [
@@ -45,7 +45,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(items.router, prefix="/items")
+app.include_router(circulation.router, prefix="/circulation")
+app.include_router(items.router, prefix="/catalog")
 app.include_router(users.router, prefix="/users")
 app.include_router(auth.router, prefix="/auth")
 

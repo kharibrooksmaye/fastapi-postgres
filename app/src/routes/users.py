@@ -84,33 +84,3 @@ async def create_user(
         f"User '{user.name}' with member ID {user.member_id} created successfully."
     )
     return {"message": message, "user": user, "token": token}
-
-
-@router.post("/{user_id}/checkout/")
-async def checkout_book(
-    user_id: int,
-    book_ids: list[int],
-    token: Annotated[str, Depends(oauth2_scheme)],
-    session: SessionDep,
-):
-    return {
-        "user_id": user_id,
-        "book_ids": book_ids,
-        "status": "checked out",
-        "token": token,
-    }
-
-
-@router.post("/{user_id}/return/")
-async def return_book(
-    user_id: int,
-    book_ids: list[int],
-    token: Annotated[str, Depends(oauth2_scheme)],
-    session: SessionDep,
-):
-    return {
-        "user_id": user_id,
-        "book_ids": book_ids,
-        "status": "returned",
-        "token": token,
-    }
