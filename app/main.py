@@ -3,8 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.database import SessionDep, session_context
-from app.mocks.mock_data import seed_database
+from app.core.database import SessionDep
 from app.src.routes import auth, circulation, items, users
 from app.core.database import init_db
 
@@ -18,10 +17,10 @@ origins = [
 
 async def startup() -> SessionDep:
     await init_db()
-    async with session_context() as session:
-        print("Seeding database with mock data...")
-        await seed_database(session)
-        print("Database seeding completed successfully!")
+    # async with session_context() as session:
+    #     print("Custom db actions")
+    #     await custom_db_edits(session)
+    #     print("Database seeding completed successfully!")
 
 
 @asynccontextmanager

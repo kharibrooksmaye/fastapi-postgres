@@ -25,8 +25,9 @@ async def login(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect username or password",
         )
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer", "user": user}
+    result = create_access_token(data={"sub": user.username})
+    access_token, expires = result.values()
+    return {"access_token": access_token, "token_type": "bearer", "user": user, "expires": expires}
 
 
 @router.post("/token")
@@ -39,8 +40,9 @@ async def get_token(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect username or password",
         )
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+    result = create_access_token(data={"sub": user.username})
+    access_token, expires = result.values()
+    return {"access_token": access_token, "token_type": "bearer", "expires": expires}
 
 
 @router.post("/register", response_model=User)

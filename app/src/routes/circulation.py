@@ -1,11 +1,13 @@
+from datetime import datetime, timedelta
 from typing import Annotated
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
 
-from app.core.authentication import oauth2_scheme
+from app.core.authentication import get_current_user, oauth2_scheme
 from app.core.authorization import require_roles
 from app.core.database import SessionDep
 from app.src.models.circulation import CatalogEvent
+from app.src.models.items import Item
 from app.src.models.users import User
 from app.src.routes.users import CommonsDependencies
 
@@ -19,54 +21,130 @@ async def read_root(
     params: CommonsDependencies,
     admin: Annotated[User, Depends(require_roles(["librarian", "admin"]))],
 ):
-    result = await session.exec(
-        select(CatalogEvent).offset(params["skip"]).limit(params["limit"])
+    # Get catalog events with user info
+    events_result = await session.exec(
+        select(User, CatalogEvent)
+        .join(CatalogEvent, User.id == CatalogEvent.user)
+        .offset(params["skip"])
+        .limit(params["limit"])
     )
-    events = result.all()
+    events_with_users = events_result.all()
 
-    return events
+    # For each event, get the item details for each catalog_id in the array
+    enriched_events = []
+    for user, event in events_with_users:
+        # Get items for all catalog_ids in the event
+        items_result = await session.exec(
+            select(Item).where(Item.id.in_(event.catalog_ids))
+        )
+        items = items_result.all()
+
+        enriched_events.append({
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "type": user.type
+            },
+            "event": {
+                "id": event.id,
+                "action": event.action,
+                "event_timestamp": event.event_timestamp,
+                "catalog_ids": event.catalog_ids,
+                "admin_id": event.admin_id,
+                "due_date": event.due_date
+            },
+            "items": [
+                {
+                    "id": item.id,
+                    "title": item.title,
+                    "author": item.author,
+                    "type": item.type
+                }
+                for item in items
+            ]
+        })
+
+    return enriched_events
 
 
-@router.post("/checkout")
-async def checkout_book(
+@router.post("/{action}/{user_id}")
+async def book_action(
     user_id: int,
     book_ids: list[int],
-    token: Annotated[str, Depends(oauth2_scheme)],
+    action: str,
+    admin: Annotated[User, Depends(require_roles(["librarian", "admin"]))],
+    user: Annotated[User, Depends(get_current_user)],
     session: SessionDep,
 ):
-    return {
-        "user_id": user_id,
-        "book_ids": book_ids,
-        "status": "checked out",
-        "token": token,
-    }
+    if user.type not in ["librarian", "admin"] and user.id != user_id:
+        print("this is not the right id")
+        raise HTTPException(status_code=403, detail="You cannot access other users' library")
 
+    # Verify the target user exists
+    target_user_result = await session.exec(select(User).where(User.id == user_id))
+    target_user = target_user_result.first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail=f"User with ID {user_id} not found")
 
-@router.post("/return/")
-async def return_book(
-    user_id: int,
-    catalog_ids: list[int],
-    token: Annotated[str, Depends(oauth2_scheme)],
-    session: SessionDep,
-):
-    return {
-        "user_id": user_id,
-        "catalog_ids": catalog_ids,
-        "status": "returned",
-        "token": token,
-    }
+    due_date = datetime.now() + timedelta(days=15)
+    try:
+        catalog_event_data = {
+            "action": action,
+            "event_timestamp": datetime.now(),
+            "catalog_ids": book_ids,
+            "admin_id": admin.id,
+            "user": user_id
+        }
 
+        # Only include due_date for checkout or renew actions
+        if action in ["checkout", "renew"]:
+            catalog_event_data["due_date"] = due_date
 
-@router.post("/renew")
-async def renew_items(
-    user_id: int,
-    catalog_ids: list[int],
-    token: Annotated[str, Depends(oauth2_scheme)],
-    session: SessionDep,
-):
-    return {
-        "user_id": user_id,
-        "catalog_ids": catalog_ids,
-        "status": "renew",
-        "token": token,
-    }
+        body = CatalogEvent(**catalog_event_data)
+
+        session.add(body)
+        await session.commit()
+        await session.refresh(body)
+
+        # Update each item's catalog_events array with this event ID
+        for catalog_id in book_ids:
+            item_result = await session.exec(select(Item).where(Item.id == catalog_id))
+            item = item_result.first()
+            if item:
+                # Initialize catalog_events if None, then append the event ID
+                if item.catalog_events is None:
+                    item.catalog_events = [body.id]
+                else:
+                    item.catalog_events.append(body.id)
+                if action == "checkout":
+                    item.is_checked_out = True
+                if action == "return":
+                    item.is_checked_out = False
+                session.add(item)
+
+        await session.commit()
+
+        action_message = ""
+        if action == "checkout":
+            action_message = "checked out"
+            
+        message = {
+            "message": f"Books {action_message} successfully",
+            "event_id": body.id,
+            "user_id": user_id,
+            "book_ids": book_ids,
+        }
+        
+        if action in ["checkout", "renew"]:
+            message["due_date"] = due_date.strftime("%Y-%m-%d %H:%M:%S")
+        return {
+            "message": f"Books {action_message} successfully",
+            "event_id": body.id,
+            "user_id": user_id,
+            "book_ids": book_ids,
+            "due_date": body.due_date
+        }
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to checkout books: {str(e)}")

@@ -16,14 +16,14 @@ class CatalogStatusEnum(str, Enum):
 
 
 class CatalogActionsEnum(str, Enum):
-    CHECKOUT = "check_out"
+    CHECKOUT = "checkout"
     RESERVE = "reserve"
     RENEW = "renew"
     RETURN = "return"
 
 
 class CatalogEvent(BaseModel):
-    action: CatalogActionsEnum
+    action: str
     event_timestamp: datetime.datetime
     user: int
     catalog_id: int

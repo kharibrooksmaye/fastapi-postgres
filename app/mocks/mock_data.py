@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select
+from sqlmodel import select, and_
 
 # Import models
 import sys
@@ -71,3 +71,20 @@ async def seed_database(session: AsyncSession):
 
         await session.commit()
         print(f"Successfully seeded {len(mock_users)} users")
+
+
+# async def custom_db_edits(session: AsyncSession):
+#     result = await session.exec(
+#         select(Item).where(
+#             Item.catalog_events.is_not(None),
+#             )
+#         )
+#     items = result.all()
+    
+#     for item in items:
+#         item.is_checked_out = True
+#         session.add(item)
+        
+#     await session.commit()
+    
+#     return items

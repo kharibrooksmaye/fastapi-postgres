@@ -6,16 +6,22 @@ from app.core.authorization import require_roles
 from app.src.models.items import Item
 from app.core.database import SessionDep
 from app.src.models.users import User
+from app.src.routes.users import CommonsDependencies
 
 router = APIRouter()
 
-
 @router.get("/")
-async def read_root(session: SessionDep):
-    result = await session.exec(select(Item))
+async def read_root(session: SessionDep, params: CommonsDependencies):
+    query = params["q"]
+    print(query)
+
+    if query == "catalog_events":
+        item_field = getattr(Item, query)
+        result = await session.exec(select(Item).where(item_field.is_not(None)))
+    else:
+        result = await session.exec(select(Item))
     items = result.all()
     return items
-
 
 @router.get("/{item}s")
 async def get_items(item: str, session: SessionDep):
