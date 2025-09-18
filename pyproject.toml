@@ -21,6 +21,8 @@ greenlet = "^3.2.4"
 bcrypt = "^4.3.0"
 alembic = {extras = ["tz"], version = "^1.16.5"}
 tzdata = "^2025.2"
+supabase = "^2.19.0"
+requests = "^2.32.5"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

@@ -12,6 +12,13 @@ class Settings(BaseSettings):
     access_token_expire_minutes: str = "30"
     algorithm: str = "HS256"
     db_url: str
+    image_api_key: str
+    google_cxe: str
+    s3_keyid: str
+    s3_secret: str
+    supabase_url: str
+    supabase_key: str
+
 
     model_config = SettingsConfigDict(env_file=".env")
 
