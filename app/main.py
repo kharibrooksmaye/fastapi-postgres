@@ -53,3 +53,9 @@ app.include_router(auth.router, prefix="/auth")
 @app.get("/")
 async def read_root():
     return {"Hello": "World"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    from app.core.settings import settings
+    uvicorn.run(app, host="0.0.0.0", port=settings.port)
