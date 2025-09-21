@@ -6,6 +6,7 @@ from sqlmodel import SQLModel, create_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import AsyncEngine
+from supabase import AsyncClient
 
 
 from .settings import settings
@@ -16,6 +17,11 @@ async_engine = AsyncEngine(
     create_engine(postgres_url, echo=True, future=True, poolclass=NullPool)
 )
 
+async def get_supabase_client() -> AsyncClient:
+    supabase = await AsyncClient.create(
+        settings.supabase_url, settings.supabase_service_key
+    )
+    return supabase
 
 async def init_db():
     async with async_engine.begin() as conn:
@@ -39,5 +45,6 @@ async def get_session():
     async with async_session() as session:
         yield session
 
+SupabaseAsyncClientDep = Annotated[AsyncClient, Depends(get_supabase_client)]
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]

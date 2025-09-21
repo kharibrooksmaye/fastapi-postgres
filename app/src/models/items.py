@@ -7,6 +7,7 @@ class Item(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     type: str = Field(default="book", index=True)
     title: str = Field(index=True)
+    item_img_url: str | None = Field(default=None, index=True)
 
     # Book-specific fields
     author: str | None = Field(default=None, index=True)
