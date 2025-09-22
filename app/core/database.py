@@ -11,10 +11,19 @@ from supabase import AsyncClient
 
 from .settings import settings
 
-postgres_url = f"postgresql+asyncpg://{settings.db_user}:{settings.db_pw}@{settings.db_endpoint}:5432/{settings.db_name}"
+postgres_url = f"postgresql+asyncpg://{settings.db_user}:{settings.db_pw}@{settings.db_endpoint}:{settings.db_port}/{settings.db_name}"
 
 async_engine = AsyncEngine(
-    create_engine(postgres_url, echo=True, future=True, poolclass=NullPool)
+    create_engine(
+        postgres_url,
+        echo=True,
+        future=True,
+        poolclass=NullPool,
+        connect_args={
+            "command_timeout": 60,
+            "statement_timeout": 60000,  # 60 seconds in milliseconds
+        }
+    )
 )
 
 async def get_supabase_client() -> AsyncClient:
