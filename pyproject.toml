@@ -8,7 +8,7 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.13"
-asyncpg = "^0.30.0"
+psycopg = {extras = ["binary"], version = "^3.2.4"}
 python-jose = "^3.3.0"
 passlib = "^1.7.4"
 sqlalchemy = "^2.0.43"

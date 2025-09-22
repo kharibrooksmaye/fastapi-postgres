@@ -11,7 +11,7 @@ from supabase import AsyncClient
 
 from .settings import settings
 
-postgres_url = f"postgresql+asyncpg://{settings.db_user}:{settings.db_pw}@{settings.db_endpoint}:{settings.db_port}/{settings.db_name}"
+postgres_url = f"postgresql+psycopg_async://{settings.db_user}:{settings.db_pw}@{settings.db_endpoint}:{settings.db_port}/{settings.db_name}"
 
 async_engine = AsyncEngine(
     create_engine(
