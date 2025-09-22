@@ -18,11 +18,7 @@ async_engine = AsyncEngine(
         postgres_url,
         echo=True,
         future=True,
-        poolclass=NullPool,
-        connect_args={
-            "command_timeout": 60,
-            "statement_timeout": 60000,  # 60 seconds in milliseconds
-        }
+        poolclass=NullPool
     )
 )
 
