@@ -8,9 +8,9 @@ from sqlmodel import SQLModel
 
 from alembic import context
 
-from app.src.models.circulation import CatalogEvent
-from app.src.models.items import Item
-from app.src.models.users import User
+# from app.src.models.circulation import CatalogEvent
+# from app.src.models.items import Item
+# from app.src.models.users import User
 from app.core.settings import settings
 
 # this is the Alembic Config object, which provides

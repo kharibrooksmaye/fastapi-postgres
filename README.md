@@ -26,7 +26,6 @@ fastapi-postgres/
 └── app/
     ├── __init__.py
     ├── main.py
-    ├── test_main.py
     ├── mocks/
     └── src/
         ├── routes/

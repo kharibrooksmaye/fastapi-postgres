@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select, and_
+from sqlmodel import select
 
 # Import models
 import sys

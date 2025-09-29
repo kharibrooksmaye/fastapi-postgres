@@ -8,6 +8,7 @@ class UserTypeEnum(str, Enum):
     librarian = "librarian"
     admin = "admin"
 
+AdminRoleList = [UserTypeEnum.librarian, UserTypeEnum.admin]
 
 class User(BaseModel):
     id: Union[int, None] = None

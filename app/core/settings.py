@@ -18,11 +18,9 @@ class Settings(BaseSettings):
     s3_secret: str
     supabase_url: str
     supabase_key: str
-    supabase_service_key: str
-    port: int = 8080
+    supabase_service_key: str   
 
 
     model_config = SettingsConfigDict(env_file=".env")
-
 
 settings = Settings()

@@ -2,7 +2,6 @@ from typing import Annotated, Union
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlmodel import select
 
-from app.core.settings import settings
 from app.core.authorization import require_roles
 from app.src.models.items import Item
 from app.core.database import SessionDep, SupabaseAsyncClientDep
