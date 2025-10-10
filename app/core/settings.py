@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: str = "30"
     algorithm: str = "HS256"
     db_url: str
+    test_db_url: str
     image_api_key: str
     google_cxe: str
     s3_keyid: str
