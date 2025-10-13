@@ -20,7 +20,7 @@ class TestDatabase:
             email="testuser@example.com",
             member_id="1",
             type="admin",
-            password="$2b$12$KIXQJ4s0G7y8o9n5m1e5euFhFf8e8ZyFZyFZyFZyFZyFZyFZyFZy",
+            password="$2b$12$NxBnVDJB/IbsFlbGIYMVOOTGk5WpQNmc.RnV31HTcXKOBr72fkrmO",
             is_active=True
         )
         patron_user = User(
@@ -65,7 +65,7 @@ async def override_get_session():
         member_id="1",
         username="testuser",
         email="testuser@example.com",
-        password="$2b$12$KIXQJ4s0G7y8o9n5m1e5euFhFf8e8ZyFZyFZyFZyFZyFZyFZyFZy",
+        password="$2b$12$NxBnVDJB/IbsFlbGIYMVOOTGk5WpQNmc.RnV31HTcXKOBr72fkrmO",
         is_active=True,
         type=UserTypeEnum.admin
     )
@@ -89,7 +89,7 @@ async def override_get_session_for_items():
         member_id="1",
         username="testuser",
         email="testuser@example.com",
-        password="$2b$12$KIXQJ4s0G7y8o9n5m1e5euFhFf8e8ZyFZyFZyFZyFZyFZyFZyFZy",
+        password="$2b$12$NxBnVDJB/IbsFlbGIYMVOOTGk5WpQNmc.RnV31HTcXKOBr72fkrmO",
         is_active=True,
         type=UserTypeEnum.admin
     )
@@ -105,7 +105,7 @@ async def override_get_session_for_items():
     yield mock_session
 async def override_get_my_info():
     """Mock function to override get_current_user dependency"""
-    hashed_password = "$2b$12$KIXQJ4s0G7y8o9n5m1e5euFhFf8e8ZyFZyFZyFZyFZyFZyFZyFZy"
+    hashed_password = "$2b$12$NxBnVDJB/IbsFlbGIYMVOOTGk5WpQNmc.RnV31HTcXKOBr72fkrmO"
     return User(
         id=1,
         name="Test User",
