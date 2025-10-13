@@ -21,7 +21,6 @@ async def read_root(
     params: CommonsDependencies,
     admin: Annotated[User, Depends(require_roles(["librarian", "admin"]))],
 ):
-    # Get catalog events with user info
     events_result = await session.exec(
         select(User, CatalogEvent)
         .join(CatalogEvent, User.id == CatalogEvent.user)
@@ -30,10 +29,9 @@ async def read_root(
     )
     events_with_users = events_result.all()
 
-    # For each event, get the item details for each catalog_id in the array
     enriched_events = []
     for user, event in events_with_users:
-        # Get items for all catalog_ids in the event
+
         items_result = await session.exec(
             select(Item).where(Item.id.in_(event.catalog_ids))
         )
@@ -81,7 +79,6 @@ async def book_action(
         print("this is not the right id")
         raise HTTPException(status_code=403, detail="You cannot access other users' library")
 
-    # Verify the target user exists
     target_user_result = await session.exec(select(User).where(User.id == user_id))
     target_user = target_user_result.first()
     if not target_user:
@@ -97,7 +94,7 @@ async def book_action(
             "user": user_id
         }
 
-        # Only include due_date for checkout or renew actions
+
         if action in ["checkout", "renew"]:
             catalog_event_data["due_date"] = due_date
 
@@ -107,12 +104,12 @@ async def book_action(
         await session.commit()
         await session.refresh(body)
 
-        # Update each item's catalog_events array with this event ID
+
         for catalog_id in book_ids:
             item_result = await session.exec(select(Item).where(Item.id == catalog_id))
             item = item_result.first()
             if item:
-                # Initialize catalog_events if None, then append the event ID
+        
                 if item.catalog_events is None:
                     item.catalog_events = [body.id]
                 else:

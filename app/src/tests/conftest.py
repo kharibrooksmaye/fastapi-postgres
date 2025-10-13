@@ -8,7 +8,7 @@ from sqlmodel import SQLModel
 from app.core.authentication import get_current_user, oauth2_scheme
 from app.core.database import get_session
 from app.main import app
-from app.src.tests.utils import TestDatabase, override_get_my_info, override_get_session, override_oauth2_scheme
+from app.src.tests.utils import TestDatabase, override_get_my_info, override_oauth2_scheme
 
 postgresql_process = factories.postgresql_proc(
     executable="/opt/homebrew/opt/postgresql@16/bin/pg_ctl"
@@ -29,17 +29,45 @@ def create_and_delete_database(postgresql_session):
     SQLModel.metadata.drop_all(engine)
 
 @pytest.fixture
-def authenticated_client():
+def authenticated_client(create_and_delete_database):
+    test_db_url = create_and_delete_database
+    
+    async def override_get_session_real():
+        from sqlmodel.ext.asyncio.session import AsyncSession
+        from sqlalchemy.ext.asyncio import create_async_engine
+        from sqlalchemy.orm import sessionmaker
+        
+        async_url = test_db_url.replace("postgresql+psycopg://", "postgresql+psycopg_async://")
+        engine = create_async_engine(async_url)
+        
+        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        
+        async with async_session() as session:
+            yield session
     """Client with mocked authentication"""
     app.dependency_overrides[get_current_user] = override_get_my_info
     app.dependency_overrides[oauth2_scheme] = override_oauth2_scheme
-    app.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[get_session] = override_get_session_real
     yield client
     app.dependency_overrides.clear()
     
 @pytest.fixture
-def unauthenticated_client():
+def unauthenticated_client(create_and_delete_database):
+    test_db_url = create_and_delete_database
+    
+    async def override_get_session_real():
+        from sqlmodel.ext.asyncio.session import AsyncSession
+        from sqlalchemy.ext.asyncio import create_async_engine
+        from sqlalchemy.orm import sessionmaker
+        
+        async_url = test_db_url.replace("postgresql+psycopg://", "postgresql+psycopg_async://")
+        engine = create_async_engine(async_url)
+        
+        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        
+        async with async_session() as session:
+            yield session
     """Client without authentication"""
-    app.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[get_session] = override_get_session_real
     yield client
     app.dependency_overrides.clear()

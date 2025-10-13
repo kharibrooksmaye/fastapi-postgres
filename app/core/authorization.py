@@ -1,4 +1,3 @@
-# prevent patrons from accessing admin routes
 from typing import List, Union
 from fastapi import Depends, HTTPException
 from starlette.status import HTTP_403_FORBIDDEN

@@ -22,7 +22,6 @@ async def supabase():
     supabase: Client = await create_async_client(url, key)
     return supabase
 
-# retrieve all existing catalog items and use their name to search the endpoint for images
 async def get_images():
     print(settings.db_url)
     engine = create_async_engine(settings.db_url)

@@ -1,6 +1,4 @@
 def test_authenticated_requests(authenticated_client):
-    # Override get_current_user to simulate authenticated user
-    
     response = authenticated_client.get("/users/me/")
     print("Response status:", response.status_code)
     print("Response body:", response.json())
@@ -20,6 +18,7 @@ def test_authenticated_requests(authenticated_client):
     assert "message" in response.json()
     
     response = authenticated_client.post("/users/", json={
+        "name": "Test User",
         "username": "newuser",
         "email": "newuser@example.com",
         "password": "newpassword"

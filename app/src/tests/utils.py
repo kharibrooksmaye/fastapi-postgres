@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, Mock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.core.authentication import create_access_token
 from app.src.models.items import Item
 from app.src.models.users import User
 from app.core.settings import settings
@@ -13,7 +14,6 @@ class TestDatabase:
         self.session = session
     
     def populate_test_data(self):
-        # populate database with three test users (one admin, one patron, and one librarian), and five test items
         test_user = User(
             username="testuser",
             name="Test User",
@@ -58,8 +58,6 @@ class TestDatabase:
 
 async def override_get_session():
     mock_session = AsyncMock()
-
-    # Mock the exec method to return test data
     mock_result = Mock()
     test_user = User(
         id=1,
@@ -82,6 +80,29 @@ async def override_get_session():
 
     yield mock_session
 
+async def override_get_session_for_items():
+    mock_session = AsyncMock()
+    mock_result = Mock()
+    test_user = User(
+        id=1,
+        name="Test User",
+        member_id="1",
+        username="testuser",
+        email="testuser@example.com",
+        password="$2b$12$KIXQJ4s0G7y8o9n5m1e5euFhFf8e8ZyFZyFZyFZyFZyFZyFZyFZy",
+        is_active=True,
+        type=UserTypeEnum.admin
+    )
+    mock_result.first.return_value = test_user
+    mock_result.all.return_value = [test_user]
+
+    mock_session.exec = AsyncMock(return_value=mock_result)
+    mock_session.add = Mock()
+    mock_session.commit = AsyncMock()
+    mock_session.refresh = AsyncMock()
+    mock_session.delete = AsyncMock()
+
+    yield mock_session
 async def override_get_my_info():
     """Mock function to override get_current_user dependency"""
     hashed_password = "$2b$12$KIXQJ4s0G7y8o9n5m1e5euFhFf8e8ZyFZyFZyFZyFZyFZyFZyFZy"
@@ -98,7 +119,11 @@ async def override_get_my_info():
 
 def override_oauth2_scheme():
     return "testtoken"
-     
+
+def override_create_access_token(data: dict):
+    token = create_access_token(data)
+    return token
+
 async def override_get_db():
     test_engine = await create_engine(settings.test_db_url)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
