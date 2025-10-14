@@ -30,13 +30,16 @@ async def read_root(
     events_with_users = events_result.all()
 
     enriched_events = []
+    all_item_ids = set()
     for user, event in events_with_users:
-
-        items_result = await session.exec(
-            select(Item).where(Item.id.in_(event.catalog_ids))
+        all_item_ids.update(event.catalog_ids)
+    items_result = await session.exec(
+            select(Item).where(Item.id.in_(all_item_ids))
         )
-        items = items_result.all()
-
+    all_items = {item.id: item for item in items_result.all()}
+    
+    for user, event in events_with_users:
+        items = [all_items[id] for id in event.catalog_ids if id in all_items]
         enriched_events.append({
             "user": {
                 "id": user.id,
@@ -64,7 +67,6 @@ async def read_root(
         })
 
     return enriched_events
-
 
 @router.post("/{action}/{user_id}")
 async def book_action(
@@ -105,11 +107,15 @@ async def book_action(
         await session.refresh(body)
 
 
-        for catalog_id in book_ids:
-            item_result = await session.exec(select(Item).where(Item.id == catalog_id))
-            item = item_result.first()
-            if item:
+        items_result = await session.exec(select(Item).where(Item.id.in_(book_ids)))
         
+        items = {item.id: item for item in items_result.all()}
+        
+        print(items)
+
+        for catalog_id in book_ids:
+            item = items.get(catalog_id)
+            if item:
                 if item.catalog_events is None:
                     item.catalog_events = [body.id]
                 else:
