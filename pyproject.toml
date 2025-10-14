@@ -36,6 +36,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 pythonpath = "."
+asyncio_mode = "auto"
 addopts = [
     "--import-mode=importlib",
     "--cov=app",
@@ -45,7 +46,8 @@ addopts = [
 [dependency-groups]
 dev = [
     "pytest-postgresql (>=7.0.2,<8.0.0)",
-    "pytest-mock (>=3.15.1,<4.0.0)"
+    "pytest-mock (>=3.15.1,<4.0.0)",
+    "pytest-asyncio (>=1.2.0,<2.0.0)"
 ]
 
 [tool.coverage.run]

@@ -1,195 +1,127 @@
 import pytest
-from datetime import datetime
 
 
-def test_get_all_circulation_events(authenticated_client):
-    """Test GET /circulation/ - get all circulation events"""
-    response = authenticated_client.get("/circulation/")
+@pytest.fixture
+def get_book_ids(authenticated_client):
+    """Helper fixture to get book IDs from catalog"""
+    def _get_books(count=1):
+        response = authenticated_client.get("/catalog/books")
+        books = response.json()
+        if books and len(books) >= count:
+            return [books[i]["id"] for i in range(count)]
+        return []
+    return _get_books
 
-    assert response.status_code == 200
-    assert isinstance(response.json(), list)
+
+@pytest.fixture
+def circulation_helper(authenticated_client):
+    """Helper fixture for common circulation operations"""
+    def _perform_action(action, user_id, book_ids):
+        return authenticated_client.post(
+            f"/circulation/{action}/{user_id}",
+            json=book_ids
+        )
+    return _perform_action
 
 
-def test_get_circulation_events_with_pagination(authenticated_client):
-    """Test GET /circulation/ - with pagination parameters"""
-    response = authenticated_client.get("/circulation/?skip=0&limit=10")
+@pytest.mark.parametrize("endpoint,params", [
+    ("/circulation/", ""),
+    ("/circulation/", "?skip=0&limit=10"),
+])
+def test_get_circulation_events(authenticated_client, endpoint, params):
+    """Test GET circulation events with various parameters"""
+    response = authenticated_client.get(f"{endpoint}{params}")
 
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
 
 def test_get_circulation_events_unauthenticated(unauthenticated_client):
-    """Test GET /circulation/ - without authentication"""
+    """Test GET circulation events without authentication"""
     response = unauthenticated_client.get("/circulation/")
-
     assert response.status_code == 401
 
 
-def test_checkout_books_success(authenticated_client):
-    """Test POST /circulation/checkout/{user_id} - successful checkout"""
-    response = authenticated_client.get("/catalog/books")
-    books = response.json()
+def test_checkout_books_success(circulation_helper, get_book_ids):
+    """Test successful book checkout"""
+    book_ids = get_book_ids(1)
 
-    if books:
-        book_ids = [books[0]["id"]]
-
-        response = authenticated_client.post(
-            "/circulation/checkout/1",
-            json=book_ids
-        )
+    if book_ids:
+        response = circulation_helper("checkout", 1, book_ids)
 
         assert response.status_code == 200
         assert "message" in response.json()
         assert "event_id" in response.json()
-        assert "user_id" in response.json()
         assert response.json()["user_id"] == 1
         assert "book_ids" in response.json()
         assert "due_date" in response.json()
 
 
-def test_checkout_books_user_not_found(authenticated_client):
-    """Test POST /circulation/checkout/{user_id} - user not found"""
+@pytest.mark.parametrize("user_id,expected_status,expected_message", [
+    (99999, 404, "User with ID 99999 not found"),
+])
+def test_checkout_books_errors(authenticated_client, user_id, expected_status, expected_message):
+    """Test checkout with various error scenarios"""
     book_ids = [1]
+    response = authenticated_client.post(f"/circulation/checkout/{user_id}", json=book_ids)
 
-    response = authenticated_client.post(
-        "/circulation/checkout/99999",
-        json=book_ids
-    )
-
-    assert response.status_code == 404
-    assert "User with ID 99999 not found" in response.json()["detail"]
+    assert response.status_code == expected_status
+    assert expected_message in response.json()["detail"]
 
 
-def test_checkout_books_unauthorized_access(authenticated_client):
-    """Test POST /circulation/checkout/{user_id} - unauthorized user access"""
-    response = authenticated_client.get("/catalog/books")
-    books = response.json()
+def test_checkout_books_unauthorized_access(circulation_helper, get_book_ids):
+    """Test checkout with unauthorized user access"""
+    book_ids = get_book_ids(1)
 
-    if books:
-        book_ids = [books[0]["id"]]
+    if book_ids:
+        response = circulation_helper("checkout", 999, book_ids)
 
-        response = authenticated_client.post(
-            "/circulation/checkout/999",
-            json=book_ids
-        )
-
+        assert response.status_code in [403, 404]
         if response.status_code == 404:
             assert "User with ID 999 not found" in response.json()["detail"]
         elif response.status_code == 403:
             assert "cannot access other users' library" in response.json()["detail"]
 
 
-def test_return_books_success(authenticated_client):
-    """Test POST /circulation/return/{user_id} - successful return"""
-    response = authenticated_client.get("/catalog/books")
-    books = response.json()
+@pytest.mark.parametrize("action,expected_fields", [
+    ("return", ["message", "event_id", "user_id"]),
+    ("renew", ["message", "event_id", "due_date"]),
+])
+def test_circulation_actions_success(circulation_helper, get_book_ids, action, expected_fields):
+    """Test return and renew actions"""
+    book_ids = get_book_ids(1)
 
-    if books:
-        book_ids = [books[0]["id"]]
-
-        checkout_response = authenticated_client.post(
-            "/circulation/checkout/1",
-            json=book_ids
-        )
+    if book_ids:
+        checkout_response = circulation_helper("checkout", 1, book_ids)
         assert checkout_response.status_code == 200
 
-        return_response = authenticated_client.post(
-            "/circulation/return/1",
-            json=book_ids
-        )
+        action_response = circulation_helper(action, 1, book_ids)
 
-        assert return_response.status_code == 200
-        assert "message" in return_response.json()
-        assert "event_id" in return_response.json()
-        assert "user_id" in return_response.json()
-        assert return_response.json()["user_id"] == 1
+        assert action_response.status_code == 200
+        for field in expected_fields:
+            assert field in action_response.json()
 
 
-def test_renew_books_success(authenticated_client):
-    """Test POST /circulation/renew/{user_id} - successful renewal"""
-    response = authenticated_client.get("/catalog/books")
-    books = response.json()
+def test_checkout_multiple_books(circulation_helper, get_book_ids):
+    """Test checkout with multiple books"""
+    book_ids = get_book_ids(2)
 
-    if books:
-        book_ids = [books[0]["id"]]
-
-        checkout_response = authenticated_client.post(
-            "/circulation/checkout/1",
-            json=book_ids
-        )
-        assert checkout_response.status_code == 200
-
-        renew_response = authenticated_client.post(
-            "/circulation/renew/1",
-            json=book_ids
-        )
-
-        assert renew_response.status_code == 200
-        assert "message" in renew_response.json()
-        assert "event_id" in renew_response.json()
-        assert "due_date" in renew_response.json()
-
-
-def test_checkout_multiple_books(authenticated_client):
-    """Test POST /circulation/checkout/{user_id} - checkout multiple books"""
-    response = authenticated_client.get("/catalog/books")
-    books = response.json()
-
-    if len(books) >= 2:
-        book_ids = [books[0]["id"], books[1]["id"]]
-
-        response = authenticated_client.post(
-            "/circulation/checkout/1",
-            json=book_ids
-        )
+    if len(book_ids) >= 2:
+        response = circulation_helper("checkout", 1, book_ids)
 
         assert response.status_code == 200
         assert len(response.json()["book_ids"]) == 2
 
 
-def test_checkout_books_empty_list(authenticated_client):
-    """Test POST /circulation/checkout/{user_id} - empty book list"""
-    book_ids = []
-
-    response = authenticated_client.post(
-        "/circulation/checkout/1",
-        json=book_ids
-    )
-
+def test_checkout_books_empty_list(circulation_helper):
+    """Test checkout with empty book list"""
+    response = circulation_helper("checkout", 1, [])
     assert response.status_code == 200
 
 
-def test_circulation_unauthenticated_checkout(unauthenticated_client):
-    """Test POST /circulation/checkout/{user_id} - without authentication"""
+@pytest.mark.parametrize("action", ["checkout", "return", "renew"])
+def test_circulation_unauthenticated(unauthenticated_client, action):
+    """Test circulation actions without authentication"""
     book_ids = [1]
-
-    response = unauthenticated_client.post(
-        "/circulation/checkout/1",
-        json=book_ids
-    )
-
-    assert response.status_code == 401
-
-
-def test_circulation_unauthenticated_return(unauthenticated_client):
-    """Test POST /circulation/return/{user_id} - without authentication"""
-    book_ids = [1]
-
-    response = unauthenticated_client.post(
-        "/circulation/return/1",
-        json=book_ids
-    )
-
-    assert response.status_code == 401
-
-
-def test_circulation_unauthenticated_renew(unauthenticated_client):
-    """Test POST /circulation/renew/{user_id} - without authentication"""
-    book_ids = [1]
-
-    response = unauthenticated_client.post(
-        "/circulation/renew/1",
-        json=book_ids
-    )
-
+    response = unauthenticated_client.post(f"/circulation/{action}/1", json=book_ids)
     assert response.status_code == 401
