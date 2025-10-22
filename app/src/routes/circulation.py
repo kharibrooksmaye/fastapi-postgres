@@ -10,6 +10,8 @@ from app.src.models.circulation import CatalogEvent
 from app.src.models.items import Item
 from app.src.models.users import User
 from app.src.routes.users import CommonsDependencies
+from app.src.schema.circulation import CatalogActionsEnum
+from app.src.schema.users import AdminRoleList
 
 router = APIRouter()
 
@@ -19,7 +21,7 @@ async def read_root(
     token: Annotated[str, Depends(oauth2_scheme)],
     session: SessionDep,
     params: CommonsDependencies,
-    admin: Annotated[User, Depends(require_roles(["librarian", "admin"]))],
+    admin: Annotated[User, Depends(require_roles(AdminRoleList))],
 ):
     events_result = await session.exec(
         select(User, CatalogEvent)
@@ -77,7 +79,10 @@ async def book_action(
     user: Annotated[User, Depends(get_current_user)],
     session: SessionDep,
 ):
-    if user.type not in ["librarian", "admin"] and user.id != user_id:
+    if action not in CatalogActionsEnum:
+        raise HTTPException(status_code=400, detail="Invalid catalog action")
+    
+    if user.type not in AdminRoleList and user.id != user_id:
         print("this is not the right id")
         raise HTTPException(status_code=403, detail="You cannot access other users' library")
 
