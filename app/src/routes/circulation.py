@@ -189,6 +189,7 @@ async def get_events(
                 "id": user.id,
                 "name": user.name,
                 "email": user.email,
+                "type": user.type
             },
             "event": {
                 "id": event.id,
