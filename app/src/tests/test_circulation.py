@@ -125,3 +125,54 @@ def test_circulation_unauthenticated(unauthenticated_client, action):
     book_ids = [1]
     response = unauthenticated_client.post(f"/circulation/{action}/1", json=book_ids)
     assert response.status_code == 401
+
+
+def test_get_my_circulation_events(authenticated_client, circulation_helper, get_book_ids):
+    """Test GET /circulation/me - get current user's circulation events"""
+    book_ids = get_book_ids(1)
+
+    if book_ids:
+        checkout_response = circulation_helper("checkout", 1, book_ids)
+        assert checkout_response.status_code == 200
+
+    response = authenticated_client.get("/circulation/me")
+
+    assert response.status_code == 200
+    events = response.json()
+    assert isinstance(events, list)
+
+    if events:
+        event = events[0]
+        assert "user" in event
+        assert "event" in event
+        assert "items" in event
+
+        assert "id" in event["user"]
+        assert "name" in event["user"]
+        assert "email" in event["user"]
+        assert event["user"]["id"] == 1
+
+        assert "id" in event["event"]
+        assert "action" in event["event"]
+        assert "event_timestamp" in event["event"]
+        assert "catalog_ids" in event["event"]
+
+        for item in event["items"]:
+            assert "id" in item
+            assert "title" in item
+            assert "type" in item
+
+
+@pytest.mark.parametrize("params", ["", "?skip=0&limit=5", "?skip=1&limit=2"])
+def test_get_my_circulation_events_with_params(authenticated_client, params):
+    """Test GET /circulation/me with pagination parameters"""
+    response = authenticated_client.get(f"/circulation/me{params}")
+
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+def test_get_my_circulation_events_unauthenticated(unauthenticated_client):
+    """Test GET /circulation/me without authentication"""
+    response = unauthenticated_client.get("/circulation/me")
+    assert response.status_code == 401

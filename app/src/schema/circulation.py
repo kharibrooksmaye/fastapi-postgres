@@ -12,7 +12,7 @@ class CatalogStatusEnum(str, Enum):
     LOST = "lost"
     READY = "ready"
     RENEWED = "renewed"
-    RESERVED = "reserved"
+    ON_HOLD = "on_hold"
 
 
 class CatalogActionsEnum(str, Enum):

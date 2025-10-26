@@ -83,7 +83,6 @@ async def book_action(
         raise HTTPException(status_code=400, detail="Invalid catalog action")
     
     if user.type not in AdminRoleList and user.id != user_id:
-        print("this is not the right id")
         raise HTTPException(status_code=403, detail="You cannot access other users' library")
 
     target_user_result = await session.exec(select(User).where(User.id == user_id))
@@ -113,10 +112,8 @@ async def book_action(
 
 
         items_result = await session.exec(select(Item).where(Item.id.in_(book_ids)))
-        
+
         items = {item.id: item for item in items_result.all()}
-        
-        print(items)
 
         for catalog_id in book_ids:
             item = items.get(catalog_id)
@@ -156,3 +153,60 @@ async def book_action(
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to checkout books: {str(e)}")
+
+
+@router.get("/me")
+async def get_events(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    session: SessionDep,
+    params: CommonsDependencies,
+    user: Annotated[User, Depends(get_current_user)]
+):
+    events_result = await session.exec(
+        select(User, CatalogEvent)
+        .join(CatalogEvent, User.id == CatalogEvent.user)
+        .where(CatalogEvent.user == user.id)
+        .offset(params["skip"])
+        .limit(params["limit"])
+    )
+    
+    events = events_result.all()
+
+    enriched_events = []
+    all_items_ids = set()
+
+    for _, event in events:
+        all_items_ids.update(event.catalog_ids)
+    items_result = await session.exec(
+        select(Item).where(Item.id.in_(all_items_ids))
+    )
+    all_items = {item.id: item for item in items_result.all()}
+    
+    for user, event in events:
+        items = [all_items[id] for id in event.catalog_ids if id in all_items]
+        enriched_events.append({
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+            },
+            "event": {
+                "id": event.id,
+                "action": event.action,
+                "event_timestamp": event.event_timestamp,
+                "catalog_ids": event.catalog_ids,
+                "admin_id": event.admin_id,
+                "due_date": event.due_date
+            },
+            "items": [
+                {
+                    "id": item.id,
+                    "title": item.title,
+                    "author": item.author,
+                    "type": item.type
+                }
+                for item in items
+            ]
+        })
+
+    return enriched_events
