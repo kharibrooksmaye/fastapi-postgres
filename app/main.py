@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.database import SessionDep
-from app.src.routes import auth, circulation, items, users
+from app.src.routes import auth, circulation, fines, items, users
 from app.core.database import init_db
 
 origins = [
@@ -49,6 +49,7 @@ app.include_router(circulation.router, prefix="/circulation")
 app.include_router(items.router, prefix="/catalog")
 app.include_router(users.router, prefix="/users")
 app.include_router(auth.router, prefix="/auth")
+app.include_router(fines.router, prefix="/fines")
 
 
 @app.get("/")

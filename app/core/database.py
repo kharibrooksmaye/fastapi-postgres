@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import Annotated
 from fastapi import Depends
-from sqlalchemy import AsyncAdaptedQueuePool, NullPool, QueuePool
+from sqlalchemy import AsyncAdaptedQueuePool
 from sqlmodel import SQLModel, create_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import sessionmaker

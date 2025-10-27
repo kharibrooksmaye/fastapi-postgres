@@ -1,8 +1,6 @@
 import asyncio
 import json
 import requests
-from typing import Annotated
-from fastapi import Depends
 from sqlalchemy import MetaData, select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from supabase import Client, create_async_client
@@ -40,9 +38,7 @@ async def get_images():
                 googleImageSearch(search_term)
                 
                 supabase_client = await supabase()
-                
-                
-        
+                await supabase_client.images.create({"url": search_term})
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(get_images())

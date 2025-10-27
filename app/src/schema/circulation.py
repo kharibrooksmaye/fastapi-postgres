@@ -17,7 +17,7 @@ class CatalogStatusEnum(str, Enum):
 
 class CatalogActionsEnum(str, Enum):
     CHECKOUT = "checkout"
-    RESERVE = "reserve"
+    PLACE_HOLD = "place_hold"
     RENEW = "renew"
     RETURN = "return"
 
