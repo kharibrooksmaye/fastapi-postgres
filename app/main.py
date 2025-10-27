@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.database import SessionDep
+from app.src.jobs.fines_scheduler import start_scheduler, stop_scheduler
 from app.src.routes import auth, circulation, fines, items, users
 from app.core.database import init_db
 
@@ -29,10 +30,12 @@ async def lifespan(app: FastAPI):
     # Startup code
     print("Starting up...")
     await startup()
+    start_scheduler()
     print("DB connected")
     yield
     # Shutdown code
     print("Shutting down...")
+    stop_scheduler()
 
 
 app = FastAPI(lifespan=lifespan)
