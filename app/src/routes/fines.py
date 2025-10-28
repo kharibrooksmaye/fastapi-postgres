@@ -29,6 +29,7 @@ async def read_fines(
     result = await session.exec(
         select(Fines)
         .options(selectinload(Fines.catalog_item))
+        .options(selectinload(Fines.user))
         .offset(params["skip"])
         .limit(params["limit"])
     )

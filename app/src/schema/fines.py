@@ -6,6 +6,19 @@ from pydantic import BaseModel
 from app.src.models.items import Item
 
 
+class UserPublic(BaseModel):
+    """Public user data without sensitive fields"""
+    id: int
+    type: str
+    name: str
+    email: Optional[str] = None
+    member_id: Optional[str] = None
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
 class FineBase(BaseModel):
     """Base fine schema without relationships"""
     id: int
@@ -19,8 +32,9 @@ class FineBase(BaseModel):
 
 
 class FineWithItem(FineBase):
-    """Fine schema with catalog item relationship"""
+    """Fine schema with catalog item and user relationships"""
     catalog_item: Optional[Item] = None
+    user: Optional[UserPublic] = None
 
     class Config:
         from_attributes = True
