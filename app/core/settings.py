@@ -19,7 +19,9 @@ class Settings(BaseSettings):
     s3_secret: str
     supabase_url: str
     supabase_key: str
-    supabase_service_key: str   
+    supabase_service_key: str
+    stripe_api_key: str
+    stripe_api_live_key: str
 
 
     model_config = SettingsConfigDict(env_file=".env")
