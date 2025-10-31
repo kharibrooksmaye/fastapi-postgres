@@ -7,6 +7,7 @@ from app.core.authentication import get_current_user, oauth2_scheme
 from app.core.authorization import require_roles
 from app.core.database import SessionDep
 from app.src.models.users import User
+from app.src.schema.users import AdminRoleList
 
 router = APIRouter()
 
@@ -21,7 +22,7 @@ CommonsDependencies = Annotated[dict, Depends(common_parameters)]
 @router.get("/")
 async def get_users(
     token: Annotated[str, Depends(oauth2_scheme)],
-    admin: Annotated[User, Depends(require_roles(["librarian", "admin"]))],
+    admin: Annotated[User, Depends(require_roles(AdminRoleList))],
     params: CommonsDependencies,
     session: SessionDep,
 ):
@@ -41,7 +42,7 @@ async def get_my_info(current_user: Annotated[User, Depends(get_current_user)]):
 async def get_user(
     user_id: int,
     token: Annotated[str, Depends(oauth2_scheme)],
-    staff: Annotated[User, Depends(require_roles(["librarian", "admin"]))],
+    staff: Annotated[User, Depends(require_roles(AdminRoleList))],
     session: SessionDep,
 ):
     result = await session.exec(select(User).where(User.member_id == user_id))
@@ -73,7 +74,7 @@ async def delete_user(
 @router.post("/")
 async def create_user(
     user: User,
-    admin: Annotated[User, Depends(require_roles(["librarian", "admin"]))],
+    admin: Annotated[User, Depends(require_roles(AdminRoleList))],
     token: Annotated[str, Depends(oauth2_scheme)],
     session: SessionDep,
 ):

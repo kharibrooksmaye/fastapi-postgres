@@ -75,7 +75,7 @@ async def book_action(
     user_id: int,
     book_ids: list[int],
     action: str,
-    admin: Annotated[User, Depends(require_roles(["librarian", "admin"]))],
+    admin: Annotated[User, Depends(require_roles(AdminRoleList))],
     user: Annotated[User, Depends(get_current_user)],
     session: SessionDep,
 ):
@@ -99,7 +99,6 @@ async def book_action(
             "admin_id": admin.id,
             "user": user_id
         }
-
 
         if action in ["checkout", "renew"]:
             catalog_event_data["due_date"] = due_date

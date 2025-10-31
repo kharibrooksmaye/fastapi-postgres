@@ -7,6 +7,7 @@ from app.src.models.items import Item
 from app.core.database import SessionDep, SupabaseAsyncClientDep
 from app.src.models.users import User
 from app.src.routes.users import CommonsDependencies
+from app.src.schema.users import AdminRoleList
 
 router = APIRouter()
 
@@ -98,7 +99,7 @@ async def upload_image(file: UploadFile, supabase: SupabaseAsyncClientDep):
 async def create_item(
     item: str,
     body_item: Item,
-    admin: Annotated[User, Depends(require_roles(["librarian", "admin"]))],
+    admin: Annotated[User, Depends(require_roles(AdminRoleList))],
     session: SessionDep,
 ) -> Item:
     body_item.type = item
@@ -119,7 +120,7 @@ async def update_item(
     item: str,
     item_id: int,
     body_item: Item,
-    admin: Annotated[User, Depends(require_roles(["librarian", "admin"]))],
+    admin: Annotated[User, Depends(require_roles(AdminRoleList))],
     session: SessionDep,
 ):
     db_item = await session.get(Item, item_id)
@@ -145,7 +146,7 @@ async def update_item(
 async def delete_item(
     item: str,
     item_id: int,
-    admin: Annotated[User, Depends(require_roles(["librarian", "admin"]))],
+    admin: Annotated[User, Depends(require_roles(AdminRoleList))],
     session: SessionDep,
 ):
     db_item = await session.get(Item, item_id)
