@@ -21,6 +21,7 @@ class Fines(SQLModel, table=True):
     issued_date: datetime = Field(default_factory=datetime.now())
     paid: bool = Field(default=False)
     days_late: int = Field(default=0)
+    payment_intent_id: Optional[str] = Field(default=None, index=True)
 
     # Relationships - automatically load related data
     catalog_item: Optional[Item] = Relationship(

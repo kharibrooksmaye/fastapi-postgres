@@ -183,6 +183,7 @@ async def pay_fine(
         "fine": fine,
         "payment_intent": intent.id,
         "client_secret": intent.client_secret,
+        "total_amount": fine.amount,
     }
 
 @router.post("/pay_multiple/")
@@ -224,4 +225,26 @@ async def pay_multiple_fines(
         "fines": fines,
         "payment_intent": intent.id,
         "client_secret": intent.client_secret,
+        "total_amount": total_amount,
     }
+    
+@router.put("/finalize_payment/")
+async def update_fines(
+    fines: Annotated[List[int], Body(embed=True)],
+    payment_intent_id: Annotated[str, Body(embed=True)],
+    admin: Annotated[User, Depends(require_roles(AdminRoleList))],
+    session: SessionDep,
+):
+    if not admin:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    for fine in fines:
+        result = await session.exec(select(Fines).where(Fines.id == fine.id))
+        fine = result.one_or_none()
+        if not fine:
+            continue  # Skip if fine not found
+        fine.paid = True
+        fine.payment_intent_id = payment_intent_id
+    
+    await session.commit()
+    return {"detail": "Fines updated successfully"}

@@ -29,6 +29,7 @@ class FineBase(BaseModel):
     issued_date: datetime
     paid: bool
     days_late: int
+    payment_intent_id: Optional[str] = None
 
 
 class FineWithItem(FineBase):
@@ -55,3 +56,4 @@ class FineUpdate(BaseModel):
     amount: Optional[Decimal] = None
     paid: Optional[bool] = None
     days_late: Optional[int] = None
+    payment_intent_id: Optional[str] = None
