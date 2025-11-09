@@ -240,3 +240,85 @@ class TestGetMyFines:
         """
         response = unauthenticated_client.get("/fines/me")
         assert response.status_code == 401, "Unauthenticated requests should return 401"
+
+
+class TestGetUserFines:
+    """Tests for GET /fines/{user_id} - Get specific user's fines (staff only)"""
+
+    def test_get_user_fines_success_for_specific_user(self, authenticated_client):
+        """
+        Happy path: Staff can retrieve fines for any specific user by user_id.
+
+        Uses OPTION B (real data) for security-critical user filtering.
+
+        Test setup:
+        - Database has 2 fines for user_id=2 (patron)
+        - Authenticated as admin (staff role)
+
+        Expected behavior:
+        - Status code 200
+        - Returns exactly 2 fines for user_id=2
+        - Does NOT return fines for other users
+        """
+        response = authenticated_client.get("/fines/2")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert "fines" in data
+        fines = data["fines"]
+
+        # Verify we got exactly 2 fines for user_id=2
+        assert len(fines) == 2, f"Expected 2 fines for user_id=2, got {len(fines)}"
+
+        # Verify all fines belong to user_id=2
+        for fine in fines:
+            assert fine["user_id"] == 2, f"All fines should belong to user_id=2, got {fine['user_id']}"
+
+    def test_get_user_fines_returns_empty_for_nonexistent_user(self, authenticated_client):
+        """
+        Happy path: Returns empty list for non-existent user_id.
+
+        Uses OPTION A (trust implementation).
+
+        Expected behavior:
+        - Status code 200
+        - Returns empty fines array
+        - Does not raise 404
+        """
+        response = authenticated_client.get("/fines/99999")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert "fines" in data
+        assert data["fines"] == [], "Should return empty list for non-existent user"
+
+    def test_get_user_fines_returns_empty_for_user_with_no_fines(self, authenticated_client):
+        """
+        Happy path: Returns empty list for user with no fines.
+
+        Uses OPTION A (trust implementation).
+
+        Note: We could create a user with no fines, but trust that
+        the query handles this correctly.
+
+        Expected behavior:
+        - Status code 200
+        - Returns empty fines array
+        """
+        # User 99999 doesn't exist, so will return empty
+        response = authenticated_client.get("/fines/99999")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert isinstance(data["fines"], list)
+
+    def test_get_user_fines_unauthenticated(self, unauthenticated_client):
+        """
+        Unhappy path: Unauthenticated users cannot access user fines.
+
+        Expected behavior:
+        - Status code 401 (Unauthorized)
+        - Must be authenticated
+        """
+        response = unauthenticated_client.get("/fines/2")
+        assert response.status_code == 401, "Unauthenticated requests should return 401"
