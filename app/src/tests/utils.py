@@ -1,10 +1,13 @@
 from unittest.mock import AsyncMock, Mock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from datetime import datetime, timedelta
+from decimal import Decimal
 
 from app.core.authentication import create_access_token
 from app.src.models.items import Item
 from app.src.models.users import User
+from app.src.models.fines import Fines
 from app.core.settings import settings
 from app.src.schema.users import UserTypeEnum
 
@@ -54,6 +57,62 @@ class TestDatabase:
         ]
 
         self.session.add_all(test_items)
+        self.session.commit()
+
+        # Add test fines for different users
+        # Fines for testuser (id=1, admin)
+        test_fines = [
+            Fines(
+                user_id=1,
+                catalog_item_id=1,
+                amount=Decimal("10.50"),
+                due_date=datetime.now() + timedelta(days=7),
+                issued_date=datetime.now(),
+                paid=False,
+                days_late=0
+            ),
+            Fines(
+                user_id=1,
+                catalog_item_id=2,
+                amount=Decimal("5.00"),
+                due_date=datetime.now() - timedelta(days=3),
+                issued_date=datetime.now() - timedelta(days=10),
+                paid=False,
+                days_late=3
+            ),
+            # Fines for patron user (id=2)
+            Fines(
+                user_id=2,
+                catalog_item_id=3,
+                amount=Decimal("15.00"),
+                due_date=datetime.now() + timedelta(days=5),
+                issued_date=datetime.now(),
+                paid=False,
+                days_late=0
+            ),
+            Fines(
+                user_id=2,
+                catalog_item_id=4,
+                amount=Decimal("20.00"),
+                due_date=datetime.now() - timedelta(days=5),
+                issued_date=datetime.now() - timedelta(days=15),
+                paid=True,
+                days_late=5,
+                payment_intent_id="pi_test_123"
+            ),
+            # Fine for librarian user (id=3)
+            Fines(
+                user_id=3,
+                catalog_item_id=5,
+                amount=Decimal("8.00"),
+                due_date=datetime.now() + timedelta(days=10),
+                issued_date=datetime.now(),
+                paid=False,
+                days_late=0
+            )
+        ]
+
+        self.session.add_all(test_fines)
         self.session.commit()
 
 async def override_get_session():
