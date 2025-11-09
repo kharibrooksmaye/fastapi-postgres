@@ -322,3 +322,105 @@ class TestGetUserFines:
         """
         response = unauthenticated_client.get("/fines/2")
         assert response.status_code == 401, "Unauthenticated requests should return 401"
+
+
+class TestGetFine:
+    """Tests for GET /fines/fine/{fine_id} - Get specific fine details"""
+
+    def test_get_fine_success_as_staff(self, authenticated_client):
+        """
+        Happy path: Staff can retrieve any fine by fine_id.
+
+        Uses OPTION B (real data) to verify fine retrieval.
+
+        Test setup:
+        - Database has fine with id=1 (belongs to user_id=1)
+        - Authenticated as admin (staff role)
+
+        Expected behavior:
+        - Status code 200
+        - Returns fine with all details
+        - Includes catalog_item and user relationships
+        """
+        response = authenticated_client.get("/fines/fine/1")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert "fine" in data, "Response should contain 'fine' key"
+        fine = data["fine"]
+
+        # Verify fine details
+        assert fine["id"] == 1
+        assert fine["user_id"] == 1
+        assert "catalog_item" in fine
+        assert "user" in fine
+
+    def test_get_fine_success_as_owner(self, authenticated_client):
+        """
+        Happy path: User can retrieve their own fine.
+
+        Uses OPTION B (real data) for ownership verification.
+
+        Test setup:
+        - Database has fine with id=1 (belongs to user_id=1)
+        - Authenticated as user_id=1 (owns the fine)
+
+        Expected behavior:
+        - Status code 200
+        - Returns the fine (user owns it)
+        - Includes relationships
+        """
+        response = authenticated_client.get("/fines/fine/1")
+        assert response.status_code == 200
+
+        data = response.json()
+        fine = data["fine"]
+
+        # Verify it's the user's fine
+        assert fine["id"] == 1
+        assert fine["user_id"] == 1
+
+    def test_get_fine_not_found(self, authenticated_client):
+        """
+        Unhappy path: Returns 404 for non-existent fine_id.
+
+        Expected behavior:
+        - Status code 404
+        - Error detail message indicates fine not found
+        - Checked BEFORE authorization (404 takes precedence)
+        """
+        response = authenticated_client.get("/fines/fine/99999")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Fine not found"
+
+    def test_get_fine_includes_relationships(self, authenticated_client):
+        """
+        Happy path: Response includes eager-loaded relationships.
+
+        Uses OPTION A (trust implementation) for relationship checks.
+
+        Expected behavior:
+        - Status code 200
+        - Fine includes catalog_item relationship
+        - Fine includes user relationship
+        - Uses FineWithItem schema
+        """
+        response = authenticated_client.get("/fines/fine/1")
+        assert response.status_code == 200
+
+        data = response.json()
+        fine = data["fine"]
+
+        assert "catalog_item" in fine, "Fine should include catalog_item"
+        assert "user" in fine, "Fine should include user"
+
+    def test_get_fine_unauthenticated(self, unauthenticated_client):
+        """
+        Unhappy path: Unauthenticated users cannot access fine details.
+
+        Expected behavior:
+        - Status code 401 (Unauthorized)
+        - Must be authenticated
+        """
+        response = unauthenticated_client.get("/fines/fine/1")
+        assert response.status_code == 401, "Unauthenticated requests should return 401"

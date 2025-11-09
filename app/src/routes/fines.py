@@ -84,7 +84,6 @@ async def get_user_fines(
 async def get_fine(
     fine_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
-    staff: Annotated[User, Depends(require_roles(AdminRoleList))],
     session: SessionDep,
 ):
     result = await session.exec(
@@ -100,7 +99,9 @@ async def get_fine(
         raise HTTPException(status_code=404, detail="Fine not found")
 
     # Then check authorization
-    if not staff and current_user.id != fine.user_id:
+    # Allow if user is staff (admin/librarian) OR if user owns the fine
+    is_staff = current_user.type in AdminRoleList
+    if not is_staff and current_user.id != fine.user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # Convert to response model to include relationships
