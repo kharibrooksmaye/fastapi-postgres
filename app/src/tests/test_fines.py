@@ -424,3 +424,92 @@ class TestGetFine:
         """
         response = unauthenticated_client.get("/fines/fine/1")
         assert response.status_code == 401, "Unauthenticated requests should return 401"
+
+
+class TestDeleteFine:
+    """Tests for DELETE /fines/{fine_id} - Delete specific fine (admin only)"""
+
+    def test_delete_fine_success(self, authenticated_client):
+        """
+        Happy path: Admin can delete a fine by fine_id.
+
+        Uses OPTION B (real data) to verify deletion.
+
+        Test setup:
+        - Database has fine with id=1
+        - Authenticated as admin
+
+        Expected behavior:
+        - Status code 200
+        - Returns success message
+        - Fine is actually deleted from database
+        """
+        response = authenticated_client.delete("/fines/1")
+        assert response.status_code == 200
+        assert response.json()["detail"] == "Fine deleted successfully"
+
+        # Verify fine was deleted by trying to get it
+        get_response = authenticated_client.get("/fines/fine/1")
+        assert get_response.status_code == 404, "Fine should be deleted"
+
+    def test_delete_fine_not_found(self, authenticated_client):
+        """
+        Unhappy path: Returns 404 when trying to delete non-existent fine.
+
+        Expected behavior:
+        - Status code 404
+        - Error detail indicates fine not found
+        """
+        response = authenticated_client.delete("/fines/99999")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Fine not found"
+
+    def test_delete_fine_unauthenticated(self, unauthenticated_client):
+        """
+        Unhappy path: Unauthenticated users cannot delete fines.
+
+        Expected behavior:
+        - Status code 401 (Unauthorized)
+        - Must be authenticated as admin
+        """
+        response = unauthenticated_client.delete("/fines/1")
+        assert response.status_code == 401, "Unauthenticated requests should return 401"
+
+
+class TestDeleteAllFines:
+    """Tests for DELETE /fines/ - Delete all fines (admin only)"""
+
+    def test_delete_all_fines_success(self, authenticated_client):
+        """
+        Happy path: Admin can delete all fines.
+
+        Uses OPTION B (real data) to verify all fines deleted.
+
+        Test setup:
+        - Database has 5 fines total
+        - Authenticated as admin
+
+        Expected behavior:
+        - Status code 200
+        - Returns success message
+        - All fines are deleted from database
+        """
+        response = authenticated_client.delete("/fines/")
+        assert response.status_code == 200
+        assert response.json()["detail"] == "All fines deleted successfully"
+
+        # Verify all fines were deleted
+        get_response = authenticated_client.get("/fines/")
+        assert get_response.status_code == 200
+        assert len(get_response.json()["fines"]) == 0, "All fines should be deleted"
+
+    def test_delete_all_fines_unauthenticated(self, unauthenticated_client):
+        """
+        Unhappy path: Unauthenticated users cannot delete all fines.
+
+        Expected behavior:
+        - Status code 401 (Unauthorized)
+        - Must be authenticated as admin
+        """
+        response = unauthenticated_client.delete("/fines/")
+        assert response.status_code == 401, "Unauthenticated requests should return 401"
