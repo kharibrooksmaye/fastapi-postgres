@@ -666,3 +666,210 @@ class TestPayFine:
         assert "due_date" in metadata
         assert "days_late" in metadata
         assert "paid_on" in metadata
+
+
+class TestPayMultipleFines:
+    """Tests for POST /fines/pay_multiple/ - Create payment intent for multiple fines"""
+
+    @patch("app.src.routes.fines.create_stripe_payment_intent")
+    def test_pay_multiple_fines_success_as_owner(self, mock_stripe, authenticated_client):
+        """
+        Happy path: User can pay multiple of their own fines.
+
+        Uses OPTION B (real data) to verify authorization.
+
+        Test setup:
+        - Fine id=1 and id=2 both belong to user_id=1 (testuser - authenticated user)
+        - Mock Stripe payment intent creation
+
+        Expected behavior:
+        - Status code 200
+        - Returns fines data, payment_intent, client_secret, total_amount
+        - Total amount is sum of both fines
+        - Stripe payment intent created with correct total
+        """
+        # Mock Stripe response
+        mock_intent = MagicMock()
+        mock_intent.id = "pi_test_multiple_123"
+        mock_intent.client_secret = "pi_test_multiple_123_secret"
+        mock_stripe.return_value = mock_intent
+
+        response = authenticated_client.post(
+            "/fines/pay_multiple/",
+            json={"fine_ids": [1, 2]}
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert "fines" in data, "Response should contain fines array"
+        assert "payment_intent" in data, "Response should contain payment_intent ID"
+        assert "client_secret" in data, "Response should contain client_secret"
+        assert "total_amount" in data, "Response should contain total_amount"
+
+        # Verify both fines are returned
+        assert len(data["fines"]) == 2, "Should return 2 fines"
+
+        # Verify all fines belong to the user
+        for fine in data["fines"]:
+            assert fine["user_id"] == 1, "All fines should belong to user_id=1"
+
+        # Verify Stripe was called
+        assert mock_stripe.called, "Stripe payment intent should be created"
+
+    @patch("app.src.routes.fines.create_stripe_payment_intent")
+    def test_pay_multiple_fines_success_as_admin(self, mock_stripe, authenticated_client):
+        """
+        Happy path: Admin can pay multiple fines for any user.
+
+        Uses OPTION B (real data) to verify admin authorization.
+
+        Test setup:
+        - Fine id=1 belongs to user_id=1
+        - Fine id=3 belongs to user_id=2
+        - Authenticated as admin (user_id=1)
+        - Mock Stripe payment intent creation
+
+        Expected behavior:
+        - Status code 200
+        - Admin can pay fines for different users
+        - Returns payment intent with total amount
+        """
+        # Mock Stripe response
+        mock_intent = MagicMock()
+        mock_intent.id = "pi_test_admin_multiple"
+        mock_intent.client_secret = "pi_test_admin_multiple_secret"
+        mock_stripe.return_value = mock_intent
+
+        response = authenticated_client.post(
+            "/fines/pay_multiple/",
+            json={"fine_ids": [1, 3]}
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert len(data["fines"]) == 2, "Should return 2 fines"
+        assert "payment_intent" in data
+        assert "total_amount" in data
+        assert mock_stripe.called
+
+    @patch("app.src.routes.fines.create_stripe_payment_intent")
+    def test_pay_multiple_fines_calculates_total(self, mock_stripe, authenticated_client):
+        """
+        Happy path: Verify total amount is sum of all fine amounts.
+
+        Uses OPTION B (real data) to verify calculation.
+
+        Test setup:
+        - Fine id=1: amount=10.50 (Decimal)
+        - Fine id=2: amount=5.00 (Decimal)
+        - Expected total: 1550 cents (10.50 + 5.00 = 15.50 * 100)
+
+        Expected behavior:
+        - Status code 200
+        - total_amount in response is sum of individual amounts
+        """
+        # Mock Stripe response
+        mock_intent = MagicMock()
+        mock_intent.id = "pi_test_total"
+        mock_intent.client_secret = "pi_test_total_secret"
+        mock_stripe.return_value = mock_intent
+
+        response = authenticated_client.post(
+            "/fines/pay_multiple/",
+            json={"fine_ids": [1, 2]}
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        # Total should be sum of amounts (already in cents in the endpoint)
+        # Fine 1: 10.50 -> int(10.50) = 10
+        # Fine 2: 5.00 -> int(5.00) = 5
+        # Total: 15
+        assert data["total_amount"] == 15, f"Expected total 15, got {data['total_amount']}"
+
+    def test_pay_multiple_fines_not_found(self, authenticated_client):
+        """
+        Unhappy path: Returns 404 when no fines found for provided IDs.
+
+        Expected behavior:
+        - Status code 404
+        - Error detail indicates no fines found
+        """
+        response = authenticated_client.post(
+            "/fines/pay_multiple/",
+            json={"fine_ids": [99999, 99998]}
+        )
+        assert response.status_code == 404
+        assert response.json()["detail"] == "No fines found"
+
+    def test_pay_multiple_fines_one_already_paid(self, authenticated_client):
+        """
+        Unhappy path: Returns 400 when one of the fines is already paid.
+
+        Uses OPTION B (real data) - fine id=4 is already paid.
+
+        Test setup:
+        - Fine id=1 is unpaid
+        - Fine id=4 belongs to user_id=2 and is already paid (paid=True)
+        - Authenticated as admin who can access both
+
+        Expected behavior:
+        - Status code 400 (Bad Request)
+        - Error message indicates specific fine is already paid
+        """
+        response = authenticated_client.post(
+            "/fines/pay_multiple/",
+            json={"fine_ids": [1, 4]}
+        )
+        assert response.status_code == 400
+        assert "already paid" in response.json()["detail"].lower()
+        assert "4" in response.json()["detail"]  # Should mention fine ID 4
+
+    def test_pay_multiple_fines_unauthenticated(self, unauthenticated_client):
+        """
+        Unhappy path: Unauthenticated users cannot pay multiple fines.
+
+        Expected behavior:
+        - Status code 401 (Unauthorized)
+        - Must be authenticated
+        """
+        response = unauthenticated_client.post(
+            "/fines/pay_multiple/",
+            json={"fine_ids": [1, 2]}
+        )
+        assert response.status_code == 401, "Unauthenticated requests should return 401"
+
+    @patch("app.src.routes.fines.create_stripe_payment_intent")
+    def test_pay_multiple_fines_stripe_metadata(self, mock_stripe, authenticated_client):
+        """
+        Happy path: Verify Stripe payment intent includes metadata for all fines.
+
+        Uses OPTION B (real data) to verify metadata structure.
+
+        Test setup:
+        - Fine id=1 and id=2 with known catalog items
+
+        Expected behavior:
+        - Status code 200
+        - Stripe called with metadata containing all fine IDs and catalog items
+        """
+        # Mock Stripe response
+        mock_intent = MagicMock()
+        mock_intent.id = "pi_test_metadata_multi"
+        mock_intent.client_secret = "pi_test_metadata_multi_secret"
+        mock_stripe.return_value = mock_intent
+
+        response = authenticated_client.post(
+            "/fines/pay_multiple/",
+            json={"fine_ids": [1, 2]}
+        )
+        assert response.status_code == 200
+
+        # Verify Stripe was called with correct parameters
+        assert mock_stripe.called
+        call_args = mock_stripe.call_args
+
+        # Check metadata contains fine-specific keys
+        metadata = call_args.kwargs["metadata"]
+        assert "fine_1" in metadata, "Metadata should contain fine_1 key"
+        assert "fine_2" in metadata, "Metadata should contain fine_2 key"
