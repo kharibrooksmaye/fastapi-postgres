@@ -3,10 +3,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.database import SessionDep
+from app.core.database import SessionDep, init_db
 from app.src.jobs.fines_scheduler import start_scheduler, stop_scheduler
 from app.src.routes import auth, circulation, fines, items, users
-from app.core.database import init_db
+
+# Import all models to ensure they're registered with SQLModel metadata
+from app.src.models import Circulation, Fine, Item, RefreshToken, User  # noqa: F401
 
 origins = [
     "http://localhost",
