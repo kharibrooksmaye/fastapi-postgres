@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     stripe_api_live_key: str
     stripe_webhook_secret: str = ""  # Optional for local development
 
+    # Refresh token configuration
+    refresh_token_expire_days: int = 30
+    refresh_token_remember_me_days: int = 90
+
 
     model_config = SettingsConfigDict(env_file=".env")
 
