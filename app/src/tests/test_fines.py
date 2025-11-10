@@ -5,6 +5,7 @@ Testing one endpoint at a time with comprehensive coverage.
 import pytest
 from datetime import datetime, timedelta
 from decimal import Decimal
+from unittest.mock import patch, MagicMock
 
 
 class TestReadFines:
@@ -513,3 +514,155 @@ class TestDeleteAllFines:
         """
         response = unauthenticated_client.delete("/fines/")
         assert response.status_code == 401, "Unauthenticated requests should return 401"
+
+
+class TestPayFine:
+    """Tests for POST /fines/pay/{fine_id} - Create payment intent for a fine"""
+
+    @patch("app.src.routes.fines.create_stripe_payment_intent")
+    def test_pay_fine_success_as_owner(self, mock_stripe, authenticated_client):
+        """
+        Happy path: User can pay their own fine.
+
+        Uses OPTION B (real data) to verify authorization.
+
+        Test setup:
+        - Fine id=1 belongs to user_id=1 (testuser - authenticated user)
+        - Mock Stripe payment intent creation
+
+        Expected behavior:
+        - Status code 200
+        - Returns fine data, payment_intent, client_secret, total_amount
+        - Stripe payment intent created with correct amount
+        """
+        # Mock Stripe response
+        mock_intent = MagicMock()
+        mock_intent.id = "pi_test_123456"
+        mock_intent.client_secret = "pi_test_123456_secret_abc"
+        mock_stripe.return_value = mock_intent
+
+        response = authenticated_client.post("/fines/pay/1")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert "fine" in data, "Response should contain fine data"
+        assert "payment_intent" in data, "Response should contain payment_intent ID"
+        assert "client_secret" in data, "Response should contain client_secret"
+        assert "total_amount" in data, "Response should contain total_amount"
+
+        # Verify Stripe was called
+        assert mock_stripe.called, "Stripe payment intent should be created"
+
+        # Verify the fine belongs to the user
+        assert data["fine"]["user_id"] == 1
+
+    @patch("app.src.routes.fines.create_stripe_payment_intent")
+    def test_pay_fine_success_as_admin(self, mock_stripe, authenticated_client):
+        """
+        Happy path: Admin can pay any user's fine.
+
+        Uses OPTION B (real data) to verify admin authorization.
+
+        Test setup:
+        - Fine id=3 belongs to user_id=2 (patron)
+        - Authenticated as admin (user_id=1)
+        - Mock Stripe payment intent creation
+
+        Expected behavior:
+        - Status code 200
+        - Admin can pay fine for different user
+        - Returns payment intent details
+        """
+        # Mock Stripe response
+        mock_intent = MagicMock()
+        mock_intent.id = "pi_test_admin_789"
+        mock_intent.client_secret = "pi_test_admin_789_secret_xyz"
+        mock_stripe.return_value = mock_intent
+
+        response = authenticated_client.post("/fines/pay/3")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["fine"]["user_id"] == 2, "Fine should belong to user_id=2 (patron)"
+        assert "payment_intent" in data
+        assert mock_stripe.called
+
+    def test_pay_fine_not_found(self, authenticated_client):
+        """
+        Unhappy path: Returns 404 for non-existent fine.
+
+        Expected behavior:
+        - Status code 404
+        - Error detail indicates fine not found
+        - Checked BEFORE authorization
+        """
+        response = authenticated_client.post("/fines/pay/99999")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Fine not found"
+
+    def test_pay_fine_already_paid(self, authenticated_client):
+        """
+        Unhappy path: Returns 400 when trying to pay an already paid fine.
+
+        Uses OPTION B (real data) - fine id=4 is already paid.
+
+        Test setup:
+        - Fine id=4 belongs to user_id=2 and is already paid (paid=True)
+        - Authenticated as admin who can access any fine
+
+        Expected behavior:
+        - Status code 400 (Bad Request)
+        - Error message indicates fine is already paid
+        """
+        response = authenticated_client.post("/fines/pay/4")
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Fine is already paid"
+
+    def test_pay_fine_unauthenticated(self, unauthenticated_client):
+        """
+        Unhappy path: Unauthenticated users cannot pay fines.
+
+        Expected behavior:
+        - Status code 401 (Unauthorized)
+        - Must be authenticated
+        """
+        response = unauthenticated_client.post("/fines/pay/1")
+        assert response.status_code == 401, "Unauthenticated requests should return 401"
+
+    @patch("app.src.routes.fines.create_stripe_payment_intent")
+    def test_pay_fine_stripe_metadata(self, mock_stripe, authenticated_client):
+        """
+        Happy path: Verify Stripe payment intent includes correct metadata.
+
+        Uses OPTION B (real data) to verify metadata content.
+
+        Test setup:
+        - Fine id=1 with known values (amount, dates, catalog_item)
+
+        Expected behavior:
+        - Status code 200
+        - Stripe called with metadata containing fine details
+        """
+        # Mock Stripe response
+        mock_intent = MagicMock()
+        mock_intent.id = "pi_test_metadata"
+        mock_intent.client_secret = "pi_test_metadata_secret"
+        mock_stripe.return_value = mock_intent
+
+        response = authenticated_client.post("/fines/pay/1")
+        assert response.status_code == 200
+
+        # Verify Stripe was called with correct parameters
+        assert mock_stripe.called
+        call_args = mock_stripe.call_args
+
+        # Check metadata contains expected keys
+        metadata = call_args.kwargs["metadata"]
+        assert "fine_id" in metadata
+        assert "user_id" in metadata
+        assert "amount" in metadata
+        assert "catalog_item" in metadata
+        assert "issued_date" in metadata
+        assert "due_date" in metadata
+        assert "days_late" in metadata
+        assert "paid_on" in metadata
