@@ -238,14 +238,14 @@ async def update_fines(
 ):
     if not admin:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
-    for fine in fines:
-        result = await session.exec(select(Fines).where(Fines.id == fine.id))
+
+    for fine_id in fines:
+        result = await session.exec(select(Fines).where(Fines.id == fine_id))
         fine = result.one_or_none()
         if not fine:
             continue  # Skip if fine not found
         fine.paid = True
         fine.payment_intent_id = payment_intent_id
-    
+
     await session.commit()
     return {"detail": "Fines updated successfully"}

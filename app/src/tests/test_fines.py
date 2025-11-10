@@ -873,3 +873,145 @@ class TestPayMultipleFines:
         metadata = call_args.kwargs["metadata"]
         assert "fine_1" in metadata, "Metadata should contain fine_1 key"
         assert "fine_2" in metadata, "Metadata should contain fine_2 key"
+
+
+class TestFinalizePayment:
+    """Tests for PUT /fines/finalize_payment/ - Mark fines as paid (admin only)"""
+
+    def test_finalize_payment_success(self, authenticated_client):
+        """
+        Happy path: Admin can finalize payment for multiple fines.
+
+        Uses OPTION B (real data) to verify fines marked as paid.
+
+        Test setup:
+        - Fine id=1 and id=2 are unpaid
+        - Authenticated as admin
+        - Provide payment_intent_id from Stripe
+
+        Expected behavior:
+        - Status code 200
+        - Fines marked as paid=True
+        - payment_intent_id stored on fine records
+        - Returns success message
+        """
+        response = authenticated_client.put(
+            "/fines/finalize_payment/",
+            json={
+                "fines": [1, 2],
+                "payment_intent_id": "pi_test_finalized_123"
+            }
+        )
+        assert response.status_code == 200
+        assert response.json()["detail"] == "Fines updated successfully"
+
+        # Verify fines were marked as paid
+        fine_1_response = authenticated_client.get("/fines/fine/1")
+        assert fine_1_response.status_code == 200
+        fine_1_data = fine_1_response.json()["fine"]
+        assert fine_1_data["paid"] is True, "Fine 1 should be marked as paid"
+        assert fine_1_data["payment_intent_id"] == "pi_test_finalized_123"
+
+        fine_2_response = authenticated_client.get("/fines/fine/2")
+        assert fine_2_response.status_code == 200
+        fine_2_data = fine_2_response.json()["fine"]
+        assert fine_2_data["paid"] is True, "Fine 2 should be marked as paid"
+        assert fine_2_data["payment_intent_id"] == "pi_test_finalized_123"
+
+    def test_finalize_payment_single_fine(self, authenticated_client):
+        """
+        Happy path: Admin can finalize payment for a single fine.
+
+        Uses OPTION B (real data) to verify single fine update.
+
+        Test setup:
+        - Fine id=3 is unpaid (belongs to user_id=2)
+        - Authenticated as admin
+
+        Expected behavior:
+        - Status code 200
+        - Fine marked as paid
+        """
+        response = authenticated_client.put(
+            "/fines/finalize_payment/",
+            json={
+                "fines": [3],
+                "payment_intent_id": "pi_test_single_456"
+            }
+        )
+        assert response.status_code == 200
+
+        # Verify fine was marked as paid
+        fine_response = authenticated_client.get("/fines/fine/3")
+        assert fine_response.status_code == 200
+        fine_data = fine_response.json()["fine"]
+        assert fine_data["paid"] is True
+        assert fine_data["payment_intent_id"] == "pi_test_single_456"
+
+    def test_finalize_payment_nonexistent_fine(self, authenticated_client):
+        """
+        Happy path: Endpoint skips non-existent fine IDs gracefully.
+
+        Uses OPTION A (trust implementation) - endpoint continues on missing fines.
+
+        Test setup:
+        - Fine id=1 exists and is unpaid
+        - Fine id=99999 doesn't exist
+        - Authenticated as admin
+
+        Expected behavior:
+        - Status code 200 (success)
+        - Existing fine updated, non-existent fine skipped
+        - Returns success message
+        """
+        response = authenticated_client.put(
+            "/fines/finalize_payment/",
+            json={
+                "fines": [1, 99999],
+                "payment_intent_id": "pi_test_skip_789"
+            }
+        )
+        assert response.status_code == 200
+        assert response.json()["detail"] == "Fines updated successfully"
+
+        # Verify fine 1 was updated despite fine 99999 not existing
+        fine_response = authenticated_client.get("/fines/fine/1")
+        assert fine_response.status_code == 200
+        fine_data = fine_response.json()["fine"]
+        assert fine_data["paid"] is True
+
+    def test_finalize_payment_unauthenticated(self, unauthenticated_client):
+        """
+        Unhappy path: Unauthenticated users cannot finalize payments.
+
+        Expected behavior:
+        - Status code 401 (Unauthorized)
+        - Must be authenticated as admin
+        """
+        response = unauthenticated_client.put(
+            "/fines/finalize_payment/",
+            json={
+                "fines": [1, 2],
+                "payment_intent_id": "pi_test_unauthorized"
+            }
+        )
+        assert response.status_code == 401, "Unauthenticated requests should return 401"
+
+    def test_finalize_payment_empty_list(self, authenticated_client):
+        """
+        Edge case: Handles empty fines list gracefully.
+
+        Expected behavior:
+        - Status code 200 (success)
+        - No fines updated
+        - Returns success message
+        """
+        response = authenticated_client.put(
+            "/fines/finalize_payment/",
+            json={
+                "fines": [],
+                "payment_intent_id": "pi_test_empty"
+            }
+        )
+        assert response.status_code == 200
+        assert response.json()["detail"] == "Fines updated successfully"
