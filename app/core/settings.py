@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     supabase_service_key: str
     stripe_api_key: str
     stripe_api_live_key: str
+    stripe_webhook_secret: str = ""  # Optional for local development
 
 
     model_config = SettingsConfigDict(env_file=".env")

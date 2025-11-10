@@ -2,7 +2,7 @@ from datetime import datetime
 from pydoc import cli
 from re import A
 from typing import Annotated, List
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from sqlalchemy import delete
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
@@ -249,3 +249,80 @@ async def update_fines(
 
     await session.commit()
     return {"detail": "Fines updated successfully"}
+
+
+@router.post("/webhook")
+async def stripe_webhook(request: Request, session: SessionDep):
+    """
+    Stripe webhook endpoint to handle payment events.
+    This endpoint is called by Stripe when payment events occur.
+    """
+    import stripe
+    from app.core.settings import settings
+
+    # Get the raw body and signature
+    payload = await request.body()
+    sig_header = request.headers.get('stripe-signature')
+
+    try:
+        # Verify webhook signature (only if webhook secret is configured)
+        if settings.stripe_webhook_secret:
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, settings.stripe_webhook_secret
+            )
+        else:
+            # For local development without webhook secret
+            import json
+            event = json.loads(payload)
+
+        # Handle the event
+        if event['type'] == 'payment_intent.succeeded':
+            payment_intent = event['data']['object']
+            payment_intent_id = payment_intent['id']
+            metadata = payment_intent.get('metadata', {})
+
+            print(f"Payment succeeded: {payment_intent_id}")
+            print(f"Metadata: {metadata}")
+
+            # Extract fine IDs from metadata
+            fine_ids = []
+
+            # Check for single fine
+            if 'fine_id' in metadata:
+                fine_ids.append(int(metadata['fine_id']))
+            else:
+                # Check for multiple fines (fine_1, fine_2, etc.)
+                for key in metadata.keys():
+                    if key.startswith('fine_'):
+                        try:
+                            fine_id = int(key.replace('fine_', ''))
+                            fine_ids.append(fine_id)
+                        except ValueError:
+                            continue
+
+            print(f"Extracted fine IDs: {fine_ids}")
+
+            # Update fines as paid
+            for fine_id in fine_ids:
+                result = await session.exec(select(Fines).where(Fines.id == fine_id))
+                fine = result.one_or_none()
+                if fine:
+                    fine.paid = True
+                    fine.payment_intent_id = payment_intent_id
+                    print(f"Marked fine {fine_id} as paid")
+                else:
+                    print(f"Fine {fine_id} not found")
+
+            await session.commit()
+            print("Fines updated successfully via webhook")
+
+        return {"status": "success"}
+
+    except ValueError as e:
+        # Invalid payload
+        print(f"Webhook error: Invalid payload - {e}")
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        print(f"Webhook error: Invalid signature - {e}")
+        raise HTTPException(status_code=400, detail="Invalid signature")
