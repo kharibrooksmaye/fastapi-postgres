@@ -14,6 +14,7 @@ class RefreshToken(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
     token_hash: str = Field(index=True, unique=True)
+    csrf_token_hash: Optional[str] = Field(default=None, index=True)
     device_name: Optional[str] = Field(default=None, max_length=255)
     ip_address: Optional[str] = Field(default=None, max_length=45)
     user_agent: Optional[str] = Field(default=None, max_length=512)
