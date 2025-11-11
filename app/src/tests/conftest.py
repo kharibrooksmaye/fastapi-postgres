@@ -54,20 +54,36 @@ def authenticated_client(create_and_delete_database):
 @pytest.fixture
 def unauthenticated_client(create_and_delete_database):
     test_db_url = create_and_delete_database
-    
+
     async def override_get_session_real():
         from sqlmodel.ext.asyncio.session import AsyncSession
         from sqlalchemy.ext.asyncio import create_async_engine
         from sqlalchemy.orm import sessionmaker
-        
+
         async_url = test_db_url.replace("postgresql+psycopg://", "postgresql+psycopg_async://")
         engine = create_async_engine(async_url)
-        
+
         async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        
+
         async with async_session() as session:
             yield session
     """Client without authentication"""
     app.dependency_overrides[get_session] = override_get_session_real
     yield client
     app.dependency_overrides.clear()
+
+@pytest.fixture
+async def test_db_session(create_and_delete_database):
+    """Direct async database session for testing internal functions"""
+    from sqlmodel.ext.asyncio.session import AsyncSession
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.orm import sessionmaker
+
+    test_db_url = create_and_delete_database
+    async_url = test_db_url.replace("postgresql+psycopg://", "postgresql+psycopg_async://")
+    engine = create_async_engine(async_url)
+
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
+        yield session

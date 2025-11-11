@@ -278,3 +278,78 @@ async def get_user_sessions(db: Session, user_id: int):
         )
     )
     return result.all()
+
+
+# CSRF Token Management
+
+
+async def store_csrf_token(db: Session, user_id: int, csrf_token: str) -> bool:
+    """
+    Store a hashed CSRF token with the user's most recent refresh token.
+
+    This links the CSRF token to the refresh token for validation during
+    token refresh operations. The CSRF token is hashed before storage.
+
+    Args:
+        db: Database session
+        user_id: User ID
+        csrf_token: Plain CSRF token to hash and store
+
+    Returns:
+        True if stored successfully, False if no active refresh token found
+    """
+    # Import here to avoid circular dependency
+    from app.src.models.refresh_tokens import RefreshToken
+
+    # Get the most recent non-revoked refresh token for this user
+    result = await db.exec(
+        select(RefreshToken)
+        .where(
+            RefreshToken.user_id == user_id, RefreshToken.is_revoked.is_(False)
+        )
+        .order_by(RefreshToken.created_at.desc())
+    )
+    token = result.first()
+
+    if not token:
+        return False
+
+    # Hash and store the CSRF token
+    token.csrf_token_hash = hash_token(csrf_token)
+    db.add(token)
+    await db.commit()
+    return True
+
+
+async def verify_csrf_token(db: Session, user_id: int, csrf_token: str) -> bool:
+    """
+    Verify a CSRF token against the stored hash for a user.
+
+    Checks the most recent non-revoked refresh token's CSRF hash.
+
+    Args:
+        db: Database session
+        user_id: User ID
+        csrf_token: Plain CSRF token to verify
+
+    Returns:
+        True if valid, False otherwise
+    """
+    # Import here to avoid circular dependency
+    from app.src.models.refresh_tokens import RefreshToken
+
+    # Get the most recent non-revoked refresh token
+    result = await db.exec(
+        select(RefreshToken)
+        .where(
+            RefreshToken.user_id == user_id, RefreshToken.is_revoked.is_(False)
+        )
+        .order_by(RefreshToken.created_at.desc())
+    )
+    token = result.first()
+
+    if not token or not token.csrf_token_hash:
+        return False
+
+    # Verify the CSRF token against the stored hash
+    return pwd_context.verify(csrf_token, token.csrf_token_hash)
