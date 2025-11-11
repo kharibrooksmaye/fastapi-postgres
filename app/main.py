@@ -8,7 +8,7 @@ from app.src.jobs.fines_scheduler import start_scheduler, stop_scheduler
 from app.src.routes import auth, circulation, fines, items, users
 
 # Import all models to ensure they're registered with SQLModel metadata
-from app.src.models import Circulation, Fine, Item, RefreshToken, User  # noqa: F401
+from app.src.models import CatalogEvent, Fines, Item, RefreshToken, User  # noqa: F401
 
 origins = [
     "http://localhost",
