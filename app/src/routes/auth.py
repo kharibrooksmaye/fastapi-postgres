@@ -279,18 +279,33 @@ async def refresh_access_token(
 
 @router.post("/logout")
 async def logout(
+    request: Request,
+    response: Response,
     session: SessionDep,
     current_user: Annotated[User, Depends(get_current_user)],
-    refresh_token: str = Body(None, embed=True),
+    refresh_token: str | None = Body(None, embed=True),
 ):
     """
     Logout the user by revoking their refresh token(s).
-    If refresh_token is provided, only that token is revoked.
-    If not provided, all tokens for the user are revoked.
+
+    Token priority:
+    1. Refresh token from httpOnly cookie (preferred)
+    2. Refresh token from request body (backward compatibility)
+
+    If a specific refresh_token is identified, only that token is revoked.
+    If no token is provided, all tokens for the user are revoked.
+
+    Always clears the httpOnly cookie on logout.
     """
-    if refresh_token:
+    # Get refresh token from cookie or body
+    token_value = request.cookies.get("refresh_token", refresh_token)
+
+    # Clear the httpOnly cookie regardless of logout method
+    response.delete_cookie(key="refresh_token", path="/auth")
+
+    if token_value:
         # Revoke specific token
-        token_record = await verify_and_get_refresh_token(session, refresh_token)
+        token_record = await verify_and_get_refresh_token(session, token_value)
         if token_record and token_record.user_id == current_user.id:
             success = await revoke_refresh_token(session, token_record.id)
             if success:
@@ -300,7 +315,7 @@ async def logout(
             detail="Invalid refresh token",
         )
     else:
-        # Revoke all tokens for user
+        # Revoke all tokens for user (logout from all devices)
         count = await revoke_all_user_tokens(session, current_user.id)
         return {"message": f"Logged out from {count} device(s) successfully"}
 
