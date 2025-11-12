@@ -14,6 +14,7 @@ from app.core.authentication import (
     revoke_refresh_token,
     store_csrf_token,
     verify_and_get_refresh_token,
+    verify_csrf_token,
     verify_password,
 )
 from app.core.database import SessionDep
@@ -200,13 +201,33 @@ async def activate_user_lookup(
 
 @router.post("/refresh")
 async def refresh_access_token(
-    session: SessionDep, refresh_token: str = Body(..., embed=True)
+    request: Request,
+    session: SessionDep,
+    refresh_token: str | None = Body(None, embed=True),
 ):
     """
     Exchange a valid refresh token for a new access token.
-    The refresh token must be valid, not revoked, and not expired.
+    The refresh token can be provided either:
+    1. Via httpOnly cookie (preferred for security)
+    2. In the request body (backward compatibility)
+
+    When using httpOnly cookies, a CSRF token must be provided via X-CSRF-Token header.
     """
-    token_record = await verify_and_get_refresh_token(session, refresh_token)
+    # Try to get refresh token from cookie first, fall back to body
+    token_value = request.cookies.get("refresh_token", refresh_token)
+
+    if not token_value:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No refresh token provided",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # If token came from cookie, verify CSRF token
+    csrf_token = request.headers.get("X-CSRF-Token")
+    using_cookie = "refresh_token" in request.cookies
+
+    token_record = await verify_and_get_refresh_token(session, token_value)
 
     if not token_record:
         raise HTTPException(
@@ -224,15 +245,36 @@ async def refresh_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Verify CSRF token if using cookie-based authentication
+    if using_cookie:
+        if not csrf_token:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="CSRF token required when using cookie-based authentication",
+            )
+
+        csrf_valid = await verify_csrf_token(session, user.id, csrf_token)
+        if not csrf_valid:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid CSRF token",
+            )
+
     # Create new access token
     result = create_access_token(data={"sub": user.username})
     access_token, expires = result.values()
 
-    return {
+    response_data = {
         "access_token": access_token,
         "token_type": "bearer",
         "expires": expires,
     }
+
+    # Include CSRF token in response if using cookie-based auth
+    if using_cookie and csrf_token:
+        response_data["csrf_token"] = csrf_token
+
+    return response_data
 
 
 @router.post("/logout")
