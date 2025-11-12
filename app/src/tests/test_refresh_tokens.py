@@ -90,6 +90,9 @@ class TestRefreshEndpoint:
         # Wait a moment to ensure different timestamp
         time.sleep(0.1)
 
+        # Clear cookies to use body-based refresh (backward compatibility)
+        authenticated_client.cookies.clear()
+
         response = authenticated_client.post(
             "/auth/refresh", json={"refresh_token": refresh_token}
         )
@@ -117,6 +120,10 @@ class TestRefreshEndpoint:
         """Test that expired tokens cannot be refreshed"""
         # This would require manipulating the database to expire a token
         # or waiting for expiration, so we'll test with an invalid token as proxy
+
+        # Clear cookies to use body-based refresh
+        authenticated_client.cookies.clear()
+
         response = authenticated_client.post(
             "/auth/refresh", json={"refresh_token": "obviously_fake_token"}
         )
@@ -128,6 +135,9 @@ class TestRefreshEndpoint:
     ):
         """Test that refreshing updates the last_used_at timestamp"""
         refresh_token = login_with_refresh["refresh_token"]
+
+        # Clear cookies to use body-based refresh
+        authenticated_client.cookies.clear()
 
         # First refresh
         response1 = authenticated_client.post(
@@ -181,7 +191,11 @@ class TestLogoutEndpoint:
         refresh_token1 = login1.json()["refresh_token"]
         refresh_token2 = login2.json()["refresh_token"]
 
-        # Logout from all devices
+        # Clear cookies before logout to ensure no token is provided
+        # This triggers the "logout all devices" behavior
+        authenticated_client.cookies.clear()
+
+        # Logout from all devices (no token provided)
         response = authenticated_client.post(
             "/auth/logout",
             json={},
