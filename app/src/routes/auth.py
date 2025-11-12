@@ -1,5 +1,6 @@
 from typing import Annotated
-from fastapi import APIRouter, Body, Depends, Form, HTTPException, Request, status
+import secrets
+from fastapi import APIRouter, Body, Depends, Form, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import or_, select
 from app.core.authentication import (
@@ -11,10 +12,12 @@ from app.core.authentication import (
     get_user_sessions,
     revoke_all_user_tokens,
     revoke_refresh_token,
+    store_csrf_token,
     verify_and_get_refresh_token,
     verify_password,
 )
 from app.core.database import SessionDep
+from app.core.settings import settings
 from app.src.models.users import User
 from app.src.schema.users import ActivateUserRequest
 
@@ -23,6 +26,7 @@ router = APIRouter()
 
 @router.post("/login")
 async def login(
+    response: Response,
     request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: SessionDep,
@@ -44,9 +48,31 @@ async def login(
         db=session, user_id=user.id, request=request, remember_me=remember_me
     )
 
+    # Generate CSRF token for additional security
+    csrf_token = secrets.token_urlsafe(32)
+    await store_csrf_token(session, user.id, csrf_token)
+
+    # Set refresh token as httpOnly cookie for XSS protection
+    max_age = (
+        settings.refresh_token_remember_me_days * 86400
+        if remember_me
+        else settings.refresh_token_expire_days * 86400
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,  # Prevents JavaScript access (XSS protection)
+        secure=False,  # Set to True in production with HTTPS
+        samesite="strict",  # CSRF protection
+        max_age=max_age,
+        path="/auth",  # Only send cookie to /auth endpoints
+    )
+
     return {
         "access_token": access_token,
-        "refresh_token": refresh_token,
+        "refresh_token": refresh_token,  # Backward compatibility (temporary)
+        "csrf_token": csrf_token,  # Client stores in localStorage
         "token_type": "bearer",
         "user": user,
         "expires": access_expires,
@@ -56,6 +82,7 @@ async def login(
 
 @router.post("/token")
 async def get_token(
+    response: Response,
     request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: SessionDep,
@@ -77,9 +104,31 @@ async def get_token(
         db=session, user_id=user.id, request=request, remember_me=remember_me
     )
 
+    # Generate CSRF token for additional security
+    csrf_token = secrets.token_urlsafe(32)
+    await store_csrf_token(session, user.id, csrf_token)
+
+    # Set refresh token as httpOnly cookie for XSS protection
+    max_age = (
+        settings.refresh_token_remember_me_days * 86400
+        if remember_me
+        else settings.refresh_token_expire_days * 86400
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,  # Prevents JavaScript access (XSS protection)
+        secure=False,  # Set to True in production with HTTPS
+        samesite="strict",  # CSRF protection
+        max_age=max_age,
+        path="/auth",  # Only send cookie to /auth endpoints
+    )
+
     return {
         "access_token": access_token,
-        "refresh_token": refresh_token,
+        "refresh_token": refresh_token,  # Backward compatibility (temporary)
+        "csrf_token": csrf_token,  # Client stores in localStorage
         "token_type": "bearer",
         "expires": access_expires,
         "refresh_expires": refresh_expires.strftime("%Y-%m-%d %H:%M:%S"),
