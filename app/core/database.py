@@ -11,7 +11,7 @@ from supabase import AsyncClient
 
 from .settings import settings
 
-postgres_url = f"postgresql+psycopg_async://{settings.db_user}:{settings.db_pw}@{settings.db_endpoint}:{settings.db_port}/{settings.db_name}"
+postgres_url = f"postgresql+psycopg_async://{settings.db_user}:{settings.db_pw}@{settings.db_endpoint}:{settings.db_port}/{settings.db_name}?sslmode=require"
 
 async_engine = AsyncEngine(
     create_engine(
@@ -19,10 +19,13 @@ async_engine = AsyncEngine(
         echo=False,
         future=True,
         poolclass=AsyncAdaptedQueuePool,
-        pool_size=20,
-        max_overflow=10,
+        pool_size=5,  # Reduced for Supabase compatibility
+        max_overflow=5,  # Reduced for Supabase compatibility
         pool_pre_ping=True,
-        pool_recycle=3600
+        pool_recycle=300,  # 5 minutes instead of 1 hour (better for Supabase pooler)
+        connect_args={
+            "server_settings": {"jit": "off"},  # Disable JIT for better Supabase compatibility
+        }
     )
 )
 
