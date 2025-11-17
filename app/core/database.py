@@ -23,9 +23,6 @@ async_engine = AsyncEngine(
         max_overflow=5,  # Reduced for Supabase compatibility
         pool_pre_ping=True,
         pool_recycle=300,  # 5 minutes instead of 1 hour (better for Supabase pooler)
-        connect_args={
-            "server_settings": {"jit": "off"},  # Disable JIT for better Supabase compatibility
-        }
     )
 )
 
