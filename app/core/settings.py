@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 30
     refresh_token_remember_me_days: int = 90
 
+    # Environment configuration
+    environment: str = "development"  # development, staging, or production
+
 
     model_config = SettingsConfigDict(env_file=".env")
 

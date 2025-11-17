@@ -64,7 +64,7 @@ async def login(
         key="refresh_token",
         value=refresh_token,
         httponly=True,  # Prevents JavaScript access (XSS protection)
-        secure=False,  # Set to True in production with HTTPS
+        secure=settings.environment != "development",  # False for local dev, True for production
         samesite="strict",  # CSRF protection
         max_age=max_age,
         path="/auth",  # Only send cookie to /auth endpoints
@@ -120,7 +120,7 @@ async def get_token(
         key="refresh_token",
         value=refresh_token,
         httponly=True,  # Prevents JavaScript access (XSS protection)
-        secure=False,  # Set to True in production with HTTPS
+        secure=settings.environment != "development",  # False for local dev, True for production
         samesite="strict",  # CSRF protection
         max_age=max_age,
         path="/auth",  # Only send cookie to /auth endpoints
