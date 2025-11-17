@@ -28,7 +28,8 @@ async def read_root(session: SessionDep, params: CommonsDependencies):
 
 @router.get("/{item}s")
 async def get_items(item: str, session: SessionDep):
-    types = ["book", "cd", "dvd", "magazine", "newspaper", "journal"]
+    
+    types = ["book", "cd", "dvd", "magazine", "newspaper", "journal", "bluray"]
     if item in types:
         result = await session.exec(select(Item).where(Item.type == item))
     else:
