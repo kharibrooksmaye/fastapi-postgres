@@ -185,7 +185,7 @@ async def activate_user_lookup(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found with provided email and phone number",
         )
-    if user.username or user.password:
+    if user.is_active:
         return {
             "status_code": status.HTTP_206_PARTIAL_CONTENT,
             "detail": "User has already been activated, please log in",
