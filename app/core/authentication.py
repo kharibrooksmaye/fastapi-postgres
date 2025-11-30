@@ -59,6 +59,21 @@ def verify_token(token: str):
         return None
 
 
+class UserStatusException(HTTPException):
+    """Custom exception to provide structured user status information for UI"""
+    def __init__(
+        self, 
+        status_code: int, 
+        detail: str, 
+        user_status: str,
+        action_required: str = None,
+        headers: dict = None
+    ):
+        super().__init__(status_code=status_code, detail=detail, headers=headers)
+        self.user_status = user_status
+        self.action_required = action_required
+
+
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)], db: SessionDep
 ) -> User:
@@ -77,11 +92,58 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     if not user.is_active:
-        raise HTTPException(
+        raise UserStatusException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Please activate your account. Check your email for the activation link"
+            detail="Please activate your account. Check your email for the activation link",
+            user_status="inactive",
+            action_required="activation",
+            headers={"WWW-Authenticate": "Bearer"}
         )
     return user
+
+
+async def get_current_user_with_status(
+    token: Annotated[str, Depends(oauth2_scheme)], db: SessionDep
+) -> tuple[User, dict]:
+    """
+    Get current user and return status information for UI handling.
+    
+    Returns:
+        Tuple of (User object, status_info dict)
+        
+    The status_info dict contains:
+    - status: "active", "inactive", "not_found", "invalid_token"
+    - action_required: "activation", "login", etc. (if applicable)
+    - message: Human-readable message for UI
+    """
+    username = verify_token(token)
+    if username is None:
+        return None, {
+            "status": "invalid_token",
+            "action_required": "login",
+            "message": "Please log in again"
+        }
+    
+    user = await get_user(db, username=username)
+    if user is None:
+        return None, {
+            "status": "not_found",
+            "action_required": "login",
+            "message": "User account not found"
+        }
+    
+    if not user.is_active:
+        return user, {
+            "status": "inactive",
+            "action_required": "activation",
+            "message": "Please activate your account. Check your email for the activation link"
+        }
+    
+    return user, {
+        "status": "active",
+        "action_required": None,
+        "message": "User authenticated successfully"
+    }
 
 
 # Refresh Token Functions

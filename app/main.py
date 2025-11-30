@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+
 from app.core.database import SessionDep, init_db
 from app.src.jobs.fines_scheduler import start_scheduler, stop_scheduler
 from app.src.routes import auth, circulation, fines, items, users
@@ -41,6 +42,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+# UserStatusException handler removed - now using secure generic error responses
+# to prevent user enumeration attacks
+
 
 app.add_middleware(
     CORSMiddleware,

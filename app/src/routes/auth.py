@@ -38,6 +38,81 @@ from app.src.schema.users import ActivateUserRequest
 router = APIRouter()
 
 
+async def handle_inactive_user_with_token_check(user: User, session: SessionDep) -> HTTPException:
+    """
+    Handle inactive user authentication by checking token expiry and resending if needed.
+    Returns appropriate HTTPException with activation status and email resend info.
+    """
+    from datetime import datetime, timezone
+    
+    # Check if activation token is older than 48 hours or doesn't exist
+    should_resend_email = False
+    
+    if not user.activation_token_hash or not user.activation_token_expires:
+        # No activation token exists, need to create and send one
+        should_resend_email = True
+    else:
+        # Check if token is expired (current time > expiry time)
+        # Handle timezone-aware/naive datetime comparison safely
+        current_time = datetime.now(timezone.utc)
+        expires_time = user.activation_token_expires
+        
+        # Make sure both datetimes are timezone-aware for comparison
+        if expires_time.tzinfo is None:
+            expires_time = expires_time.replace(tzinfo=timezone.utc)
+            
+        if current_time > expires_time:
+            should_resend_email = True
+    
+    # Resend activation email if token is expired
+    if should_resend_email:
+        try:
+            # Create new activation token
+            activation_token = await create_activation_token(session, user.id)
+            
+            # Send new activation email
+            await send_activation_email(
+                email=user.email,
+                username=user.username,
+                activation_token=activation_token
+            )
+            
+            # Update response to indicate email was resent
+            return HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is not activated. A new activation email has been sent to your email address.",
+                headers={
+                    "X-Account-Status": "inactive",
+                    "X-Action-Required": "activation", 
+                    "X-User-Email": user.email,
+                    "X-Email-Resent": "true"
+                }
+            )
+        except Exception:
+            # If email sending fails, still inform user but don't expose error
+            return HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is not activated. Please check your email for activation instructions or try resending the activation email.",
+                headers={
+                    "X-Account-Status": "inactive",
+                    "X-Action-Required": "activation",
+                    "X-User-Email": user.email,
+                    "X-Email-Resent": "failed"
+                }
+            )
+    else:
+        # Token is still valid, just inform user
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is not activated. Please check your email for activation instructions.",
+            headers={
+                "X-Account-Status": "inactive",
+                "X-Action-Required": "activation", 
+                "X-User-Email": user.email
+            }
+        )
+
+
 @router.post("/login")
 async def login(
     response: Response,
@@ -47,11 +122,89 @@ async def login(
     remember_me: bool = False,
 ):
     user = await get_user(session, form_data.username)
-    if not user or not verify_password(form_data.password, user.password):
+    
+    # Always verify password first to prevent timing attacks
+    # Use a dummy hash if user doesn't exist to maintain consistent timing
+    if user:
+        password_valid = verify_password(form_data.password, user.password)
+    else:
+        # Perform dummy password verification to prevent timing attacks
+        from app.core.authentication import get_password_hash
+        get_password_hash("dummy_password_to_maintain_timing")
+        password_valid = False
+    
+    # SECURE TWO-STAGE AUTHENTICATION:
+    # Stage 1: Check credentials without revealing user existence
+    if not user or not password_valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect username or password",
         )
+    
+    # Stage 2: Only after valid credentials, check activation status and token expiry
+    # This is SECURE because we've already verified the password
+    if not user.is_active:
+        from datetime import datetime, timezone, timedelta
+        
+        # Check if activation token is older than 48 hours or doesn't exist
+        should_resend_email = False
+        
+        if not user.activation_token_hash or not user.activation_token_expires:
+            # No activation token exists, need to create and send one
+            should_resend_email = True
+        else:
+            # Check if token is expired (older than 48 hours)
+            # Fixed timezone issue - using simple comparison
+            if datetime.now(timezone.utc) > (user.activation_token_expires.replace(tzinfo=timezone.utc) if user.activation_token_expires.tzinfo is None else user.activation_token_expires):
+                should_resend_email = True
+        
+        # Resend activation email if token is expired
+        if should_resend_email:
+            try:
+                # Create new activation token
+                activation_token = await create_activation_token(session, user.id)
+                
+                # Send new activation email
+                await send_activation_email(
+                    email=user.email,
+                    username=user.username,
+                    activation_token=activation_token
+                )
+                
+                # Update response to indicate email was resent
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account is not activated. A new activation email has been sent to your email address.",
+                    headers={
+                        "X-Account-Status": "inactive",
+                        "X-Action-Required": "activation", 
+                        "X-User-Email": user.email,
+                        "X-Email-Resent": "true"
+                    }
+                )
+            except Exception:
+                # If email sending fails, still inform user but don't expose error
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account is not activated. Please check your email for activation instructions or try resending the activation email.",
+                    headers={
+                        "X-Account-Status": "inactive",
+                        "X-Action-Required": "activation",
+                        "X-User-Email": user.email,
+                        "X-Email-Resent": "failed"
+                    }
+                )
+        else:
+            # Token is still valid, just inform user
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is not activated. Please check your email for activation instructions.",
+                headers={
+                    "X-Account-Status": "inactive",
+                    "X-Action-Required": "activation", 
+                    "X-User-Email": user.email
+                }
+            )
 
     # Create access token (short-lived)
     result = create_access_token(data={"sub": user.username})
@@ -104,11 +257,89 @@ async def get_token(
     remember_me: bool = False,
 ):
     user = await get_user(session, form_data.username)
-    if not user or not verify_password(form_data.password, user.password):
+    
+    # Always verify password first to prevent timing attacks
+    # Use a dummy hash if user doesn't exist to maintain consistent timing
+    if user:
+        password_valid = verify_password(form_data.password, user.password)
+    else:
+        # Perform dummy password verification to prevent timing attacks
+        from app.core.authentication import get_password_hash
+        get_password_hash("dummy_password_to_maintain_timing")
+        password_valid = False
+    
+    # SECURE TWO-STAGE AUTHENTICATION:
+    # Stage 1: Check credentials without revealing user existence
+    if not user or not password_valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect username or password",
         )
+    
+    # Stage 2: Only after valid credentials, check activation status and token expiry
+    # This is SECURE because we've already verified the password
+    if not user.is_active:
+        from datetime import datetime, timezone, timedelta
+        
+        # Check if activation token is older than 48 hours or doesn't exist
+        should_resend_email = False
+        
+        if not user.activation_token_hash or not user.activation_token_expires:
+            # No activation token exists, need to create and send one
+            should_resend_email = True
+        else:
+            # Check if token is expired (older than 48 hours)
+            # Fixed timezone issue - using simple comparison
+            if datetime.now(timezone.utc) > (user.activation_token_expires.replace(tzinfo=timezone.utc) if user.activation_token_expires.tzinfo is None else user.activation_token_expires):
+                should_resend_email = True
+        
+        # Resend activation email if token is expired
+        if should_resend_email:
+            try:
+                # Create new activation token
+                activation_token = await create_activation_token(session, user.id)
+                
+                # Send new activation email
+                await send_activation_email(
+                    email=user.email,
+                    username=user.username,
+                    activation_token=activation_token
+                )
+                
+                # Update response to indicate email was resent
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account is not activated. A new activation email has been sent to your email address.",
+                    headers={
+                        "X-Account-Status": "inactive",
+                        "X-Action-Required": "activation", 
+                        "X-User-Email": user.email,
+                        "X-Email-Resent": "true"
+                    }
+                )
+            except Exception:
+                # If email sending fails, still inform user but don't expose error
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account is not activated. Please check your email for activation instructions or try resending the activation email.",
+                    headers={
+                        "X-Account-Status": "inactive",
+                        "X-Action-Required": "activation",
+                        "X-User-Email": user.email,
+                        "X-Email-Resent": "failed"
+                    }
+                )
+        else:
+            # Token is still valid, just inform user
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is not activated. Please check your email for activation instructions.",
+                headers={
+                    "X-Account-Status": "inactive",
+                    "X-Action-Required": "activation", 
+                    "X-User-Email": user.email
+                }
+            )
 
     # Create access token (short-lived)
     result = create_access_token(data={"sub": user.username})
@@ -230,6 +461,10 @@ async def resend_activation_email(
     session: SessionDep,
     email: str = Body(..., embed=True)
 ):
+    """
+    Resend activation email. Uses generic response to prevent user enumeration.
+    Only users who know their email and that they have an account can use this.
+    """
     result = await session.exec(select(User).where(User.email == email))
     user = result.first()
     
@@ -237,17 +472,55 @@ async def resend_activation_email(
         # Generate new activation token
         activation_token = await create_activation_token(session, user.id)
 
-        # Send activation email (TODO: implement email sending)
-        
+        # Send activation email
         await send_activation_email(
             email=user.email,
             username=user.username,
             activation_token=activation_token
         )
-        # Always return success message to avoid user enumeration
+        
+    # Always return success message to avoid user enumeration
+    # This is secure because users must already know their email exists
     return {
-        "message": "If an account with that email exists, an activation email has been sent.",
+        "message": "If an account with that email exists and is inactive, an activation email has been sent.",
         "status": "success",
+    }
+
+
+@router.post("/check-activation-status")
+async def check_activation_status(
+    session: SessionDep,
+    username: str = Body(..., embed=True),
+    password: str = Body(..., embed=True)
+):
+    """
+    Check if a user needs activation. Requires valid credentials to prevent enumeration.
+    This allows UI to show activation-specific help after failed login.
+    """
+    user = await get_user(session, username)
+    
+    # Verify credentials first (same timing protection as login)
+    if user:
+        password_valid = verify_password(password, user.password)
+    else:
+        from app.core.authentication import get_password_hash
+        get_password_hash("dummy_password_to_maintain_timing")
+        password_valid = False
+    
+    # Only reveal activation status for valid credentials
+    if not user or not password_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect username or password",
+        )
+    
+    # Safe to reveal activation status since credentials are verified
+    return {
+        "username": user.username,
+        "email": user.email,
+        "is_active": user.is_active,
+        "needs_activation": not user.is_active,
+        "message": "Account activation required" if not user.is_active else "Account is active"
     }
 
 @router.post("/activate/lookup")
