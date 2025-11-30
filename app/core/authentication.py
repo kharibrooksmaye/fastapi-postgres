@@ -358,3 +358,92 @@ async def verify_csrf_token(db: Session, user_id: int, csrf_token: str) -> bool:
 
     # Verify the CSRF token against the stored hash
     return pwd_context.verify(csrf_token, token.csrf_token_hash)
+
+
+def generate_activation_token() -> str:
+    """
+    Generate a cryptographically secure activation token
+
+    Returns:
+        str: a URL-safe 32-character token.
+    """
+    return secrets.token_urlsafe(32)
+
+async def create_activation_token(db: Session, user_id: int) -> str:
+    """
+    Create and store an activation token for a user.
+
+    Args:
+        db: Database session
+        user_id: ID of the user
+    Returns:
+        str: The plain activation token
+    """
+    token = generate_activation_token()
+    token_hash = hash_token(token)
+    
+    # Set 48-hour expiration
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=48)
+    
+    # Get user and update details
+    user = await db.get(User, user_id)
+    if not user:
+        raise ValueError("User not found")
+    
+    user.activation_token_hash = token_hash
+    user.activation_token_expires = expires_at
+    user.activation_token_used = False
+    
+    db.add(user)
+    await db.commit()
+    
+    return token
+
+async def verify_activation_token(db: Session, token: str) -> Optional[User]:
+    """
+    Verify an activation token for a user.
+
+    Args:
+        db: Database session
+        token: The plain activation token to verify
+        
+    Returns:
+        User object if valid, None otherwise
+        """
+        
+    result = await db.exec(
+        select(User).where(
+            User.activation_token_hash.is_not(None),
+            User.activation_token_expires > datetime.now(timezone.utc),
+            User.activation_token_used.is_(False)
+        )
+    )
+    users = result.all()
+    
+    for user in users:
+        if verify_refresh_token(token, user.activation_token_hash):
+            return user
+        
+    return None
+
+async def activate_user_with_token(db: Session, token: str) -> bool:
+    """
+    Activate a user account using their activation token.
+
+    Args:
+        db (Session): Database session
+        token (str): Plain activation token from email link
+
+    Returns:
+        True if activated successfully, False otherwise
+    """
+    user = await verify_activation_token(db, token)
+    if not user:
+        return False
+    
+    user.is_active = True
+    user.activation_token_used = True
+    
+    db.add(user)
+    await db.commit()
+    return True
