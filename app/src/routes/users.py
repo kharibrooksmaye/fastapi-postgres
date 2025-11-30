@@ -3,11 +3,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
 
-from app.core.authentication import get_current_user, oauth2_scheme
+from app.core.authentication import get_current_user, get_password_hash, oauth2_scheme
 from app.core.authorization import require_roles
 from app.core.database import SessionDep
 from app.src.models.users import User
-from app.src.schema.users import AdminRoleList
+from app.src.schema.users import AdminRoleList, UserUpdate, UserProfileUpdate
 
 router = APIRouter()
 
@@ -45,8 +45,7 @@ async def get_user(
     staff: Annotated[User, Depends(require_roles(AdminRoleList))],
     session: SessionDep,
 ):
-    result = await session.exec(select(User).where(User.member_id == user_id))
-    user = result.first()
+    user = await session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return {"token": token, "user": user}
@@ -59,16 +58,79 @@ async def delete_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     session: SessionDep,
 ):
-    result = await session.exec(select(User).where(User.member_id == user_id))
-    user = result.first()
+    user = await session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     await session.delete(user)
     await session.commit()
     return {
-        "message": f"User with member ID {user_id} deleted successfully.",
+        "message": f"User '{user.name}' (ID {user_id}) deleted successfully.",
         "token": token,
     }
+
+
+@router.put("/me/")
+async def update_my_profile(
+    user_data: UserProfileUpdate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: SessionDep,
+):
+    """Update current user's own profile"""
+    # Update user fields with provided data, excluding unset fields
+    user_dict = user_data.model_dump(exclude_unset=True)
+    
+    # Hash password if provided
+    if "password" in user_dict and user_dict["password"]:
+        user_dict["password"] = get_password_hash(user_dict["password"])
+    
+    for field, value in user_dict.items():
+        if hasattr(current_user, field):
+            setattr(current_user, field, value)
+    
+    # Update the updated_at timestamp
+    from datetime import datetime, timezone
+    current_user.updated_at = datetime.now(timezone.utc)
+    
+    await session.commit()
+    await session.refresh(current_user)
+    
+    return {"message": "Profile updated successfully", "user": current_user}
+
+
+@router.put("/{user_id}")
+async def update_user(
+    user_id: int,
+    user_data: UserUpdate,
+    admin: Annotated[User, Depends(require_roles(AdminRoleList))],
+    token: Annotated[str, Depends(oauth2_scheme)],
+    session: SessionDep,
+):
+    """Admin-only endpoint to update any user"""
+    # Find user by database id
+    existing_user = await session.get(User, user_id)
+    if not existing_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update user fields with provided data, excluding unset fields
+    user_dict = user_data.model_dump(exclude_unset=True)
+    
+    # Hash password if provided
+    if "password" in user_dict and user_dict["password"]:
+        user_dict["password"] = get_password_hash(user_dict["password"])
+    
+    for field, value in user_dict.items():
+        if hasattr(existing_user, field):
+            setattr(existing_user, field, value)
+    
+    # Update the updated_at timestamp
+    from datetime import datetime, timezone
+    existing_user.updated_at = datetime.now(timezone.utc)
+    
+    await session.commit()
+    await session.refresh(existing_user)
+    
+    message = f"User '{existing_user.name}' (ID {user_id}) updated successfully."
+    return {"message": message, "user": existing_user, "token": token}
 
 
 @router.post("/")

@@ -1,10 +1,22 @@
 from typing import Annotated
 import secrets
-from fastapi import APIRouter, Body, Depends, Form, HTTPException, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel
 from sqlmodel import or_, select
 from app.core.authentication import (
+    activate_user_with_token,
     create_access_token,
+    create_activation_token,
     create_refresh_token,
     get_current_user,
     get_password_hash,
@@ -18,6 +30,7 @@ from app.core.authentication import (
     verify_password,
 )
 from app.core.database import SessionDep
+from app.core.email import send_activation_email
 from app.core.settings import settings
 from app.src.models.users import User
 from app.src.schema.users import ActivateUserRequest
@@ -64,7 +77,8 @@ async def login(
         key="refresh_token",
         value=refresh_token,
         httponly=True,  # Prevents JavaScript access (XSS protection)
-        secure=settings.environment != "development",  # False for local dev, True for production
+        secure=settings.environment
+        != "development",  # False for local dev, True for production
         samesite="strict",  # CSRF protection
         max_age=max_age,
         path="/auth",  # Only send cookie to /auth endpoints
@@ -120,7 +134,8 @@ async def get_token(
         key="refresh_token",
         value=refresh_token,
         httponly=True,  # Prevents JavaScript access (XSS protection)
-        secure=settings.environment != "development",  # False for local dev, True for production
+        secure=settings.environment
+        != "development",  # False for local dev, True for production
         samesite="strict",  # CSRF protection
         max_age=max_age,
         path="/auth",  # Only send cookie to /auth endpoints
@@ -151,8 +166,20 @@ async def register_user(user: User, session: SessionDep):
         )
     try:
         user.password = get_password_hash(user.password)
+        user.is_active = False  # User must activate via email
         session.add(user)
         await session.commit()
+        await session.refresh(user)
+
+        activation_token = await create_activation_token(session, user.id)
+
+        # Send activation email
+        await send_activation_email(
+            email=user.email,
+            username=user.username,
+            activation_token=activation_token
+        )
+
         return user
     except Exception as e:
         print(f"Error registering user: {e}")
@@ -163,10 +190,85 @@ async def register_user(user: User, session: SessionDep):
         )
 
 
+class ActivationRequest(BaseModel):
+    token: str
+
+
+@router.post("/activate")
+async def activate_user(data: ActivationRequest, session: SessionDep):
+    """
+    Activate user account with token from their email
+
+    Security:
+    - Token must be valid
+    - Token must match hash
+    - One-time use only
+
+
+    Args:
+        data (ActivationRequest): _description_
+        session (SessionDep): _description_
+
+    Returns:
+        _type_: _description_
+    """
+
+    success = await activate_user_with_token(session, data.token)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired activation token",
+        )
+    return {
+        "message": "User account activated successfully.",
+        "status": "success",
+    }
+    
+@router.post("/resend-activation")
+async def resend_activation_email(
+    session: SessionDep,
+    email: str = Body(..., embed=True)
+):
+    result = await session.exec(select(User).where(User.email == email))
+    user = result.first()
+    
+    if user and not user.is_active:
+        # Generate new activation token
+        activation_token = await create_activation_token(session, user.id)
+
+        # Send activation email (TODO: implement email sending)
+        
+        await send_activation_email(
+            email=user.email,
+            username=user.username,
+            activation_token=activation_token
+        )
+        # Always return success message to avoid user enumeration
+    return {
+        "message": "If an account with that email exists, an activation email has been sent.",
+        "status": "success",
+    }
+
 @router.post("/activate/lookup")
 async def activate_user_lookup(
     data: Annotated[ActivateUserRequest, Form()], session: SessionDep
 ):
+    """
+    DEPRECATED: Use /auth/activate instead
+    
+    This endpoint
+
+    Args:
+        data (Annotated[ActivateUserRequest, Form): _description_
+        session (SessionDep): _description_
+
+    Raises:
+        HTTPException: _description_
+
+    Returns:
+        _type_: _description_
+    """
     email = data.email
     username = data.username
     phone_number = data.phone_number
@@ -185,7 +287,7 @@ async def activate_user_lookup(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found with provided email and phone number",
         )
-    if user.username or user.password:
+    if user.is_active:
         return {
             "status_code": status.HTTP_206_PARTIAL_CONTENT,
             "detail": "User has already been activated, please log in",
