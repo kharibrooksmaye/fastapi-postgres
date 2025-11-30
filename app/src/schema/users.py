@@ -23,6 +23,29 @@ class User(BaseModel):
     password: str
 
 
+class UserUpdate(BaseModel):
+    """Schema for updating user information - all fields optional"""
+    type: Union[UserTypeEnum, None] = None
+    name: Union[str, None] = None
+    email: Union[str, None] = None
+    member_id: Union[int, None] = None
+    phone_number: Union[str, None] = None
+    address: Union[str, None] = None
+    is_active: Union[bool, None] = None
+    username: Union[str, None] = None
+    password: Union[str, None] = None
+
+
+class UserProfileUpdate(BaseModel):
+    """Schema for users updating their own profile - excludes sensitive fields"""
+    name: Union[str, None] = None
+    email: Union[str, None] = None
+    phone_number: Union[str, None] = None
+    address: Union[str, None] = None
+    username: Union[str, None] = None
+    password: Union[str, None] = None
+
+
 class ActivateUserRequest(BaseModel):
     email: Union[str, None] = None
     phone_number: Union[str, None] = None
