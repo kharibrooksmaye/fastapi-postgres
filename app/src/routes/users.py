@@ -87,6 +87,10 @@ async def update_my_profile(
         if hasattr(current_user, field):
             setattr(current_user, field, value)
     
+    # Update the updated_at timestamp
+    from datetime import datetime, timezone
+    current_user.updated_at = datetime.now(timezone.utc)
+    
     await session.commit()
     await session.refresh(current_user)
     
@@ -117,6 +121,10 @@ async def update_user(
     for field, value in user_dict.items():
         if hasattr(existing_user, field):
             setattr(existing_user, field, value)
+    
+    # Update the updated_at timestamp
+    from datetime import datetime, timezone
+    existing_user.updated_at = datetime.now(timezone.utc)
     
     await session.commit()
     await session.refresh(existing_user)

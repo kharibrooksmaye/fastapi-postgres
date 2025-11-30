@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlmodel import Field, SQLModel
 
@@ -17,3 +17,5 @@ class User(SQLModel, table=True):
     activation_token_hash: Optional[str] = Field(default=None, index=True)
     activation_token_expires: Optional[datetime] = Field(default=None)
     activation_token_used: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), index=True)

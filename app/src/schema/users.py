@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from typing import Union
 from pydantic import BaseModel
@@ -21,6 +22,8 @@ class User(BaseModel):
     is_active: Union[bool, None] = None
     username: str
     password: str
+    created_at: Union[datetime, None] = None
+    updated_at: Union[datetime, None] = None
 
 
 class UserUpdate(BaseModel):
