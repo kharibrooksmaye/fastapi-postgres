@@ -38,6 +38,38 @@ async def get_my_info(current_user: Annotated[User, Depends(get_current_user)]):
     return current_user
 
 
+@router.get("/me/status")
+async def get_my_status(
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: SessionDep
+):
+    """
+    Get current user status - requires valid authentication.
+    This prevents user enumeration attacks.
+    """
+    
+    response = {
+        "status": "active" if current_user.is_active else "inactive",
+        "user": {
+            "id": current_user.id,
+            "name": current_user.name,
+            "email": current_user.email,
+            "username": current_user.username,
+            "type": current_user.type,
+            "is_active": current_user.is_active
+        }
+    }
+    
+    # Only add action guidance if user is inactive
+    if not current_user.is_active:
+        response["message"] = "Account requires activation"
+        response["action_required"] = "activation_required"
+    else:
+        response["message"] = "Account is active"
+    
+    return response
+
+
 @router.get("/{user_id}")
 async def get_user(
     user_id: int,
