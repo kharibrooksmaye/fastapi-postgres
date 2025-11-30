@@ -509,3 +509,184 @@ async def activate_user_with_token(db: Session, token: str) -> bool:
     db.add(user)
     await db.commit()
     return True
+
+
+# Password Management Functions
+
+async def create_password_reset_token(db: Session, user_id: int) -> str:
+    """
+    Create a password reset token for a user.
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        
+    Returns:
+        Plain text token string
+    """
+    # Generate a secure random token
+    token = secrets.token_urlsafe(32)
+    token_hash = pwd_context.hash(token)
+    
+    # Set expiration to 1 hour from now
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    
+    # Get the user
+    result = await db.exec(select(User).where(User.id == user_id))
+    user = result.first()
+    if not user:
+        raise ValueError(f"User with ID {user_id} not found")
+    
+    # Update user with new password reset token
+    user.password_reset_token_hash = token_hash
+    user.password_reset_token_expires = expires_at
+    user.password_reset_token_used = False
+    
+    db.add(user)
+    await db.commit()
+    
+    return token
+
+
+async def verify_password_reset_token(db: Session, token: str) -> Optional[User]:
+    """
+    Verify a password reset token and return the associated user.
+    
+    Args:
+        db: Database session
+        token: Plain text token
+        
+    Returns:
+        User object if token is valid, None otherwise
+    """
+    if not token:
+        return None
+    
+    # Get all users with password reset tokens that haven't expired
+    current_time = datetime.now(timezone.utc)
+    result = await db.exec(
+        select(User).where(
+            User.password_reset_token_hash.is_not(None),
+            User.password_reset_token_expires > current_time,
+            ~User.password_reset_token_used
+        )
+    )
+    users = result.all()
+    
+    # Check each user's token hash
+    for user in users:
+        if pwd_context.verify(token, user.password_reset_token_hash):
+            return user
+    
+    return None
+
+
+async def use_password_reset_token(db: Session, token: str, new_password: str) -> bool:
+    """
+    Use a password reset token to change a user's password.
+    
+    Args:
+        db: Database session
+        token: Plain text token
+        new_password: New password in plain text
+        
+    Returns:
+        True if password was reset successfully, False otherwise
+    """
+    user = await verify_password_reset_token(db, token)
+    if not user:
+        return False
+    
+    # Update password and mark token as used
+    user.password = get_password_hash(new_password)
+    user.password_reset_token_used = True
+    user.password_changed_at = datetime.now(timezone.utc)
+    user.failed_login_attempts = 0  # Reset failed attempts
+    user.account_locked_until = None  # Unlock account if locked
+    
+    db.add(user)
+    await db.commit()
+    return True
+
+
+async def increment_failed_login_attempts(db: Session, user: User) -> None:
+    """
+    Increment failed login attempts and lock account if threshold is reached.
+    
+    Args:
+        db: Database session
+        user: User object
+    """
+    user.failed_login_attempts += 1
+    
+    # Lock account after 5 failed attempts for 15 minutes
+    if user.failed_login_attempts >= 5:
+        user.account_locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+    
+    db.add(user)
+    await db.commit()
+
+
+async def reset_failed_login_attempts(db: Session, user: User) -> None:
+    """
+    Reset failed login attempts on successful login.
+    
+    Args:
+        db: Database session
+        user: User object
+    """
+    user.failed_login_attempts = 0
+    user.account_locked_until = None
+    
+    db.add(user)
+    await db.commit()
+
+
+async def is_account_locked(user: User) -> bool:
+    """
+    Check if a user account is currently locked.
+    
+    Args:
+        user: User object
+        
+    Returns:
+        True if account is locked, False otherwise
+    """
+    if user.account_locked_until is None:
+        return False
+    
+    current_time = datetime.now(timezone.utc)
+    return current_time < user.account_locked_until
+
+
+async def check_password_expiry(user: User) -> bool:
+    """
+    Check if a user's password has expired.
+    
+    Args:
+        user: User object
+        
+    Returns:
+        True if password has expired, False otherwise
+    """
+    if user.password_expires_at is None:
+        return False
+    
+    current_time = datetime.now(timezone.utc)
+    return current_time > user.password_expires_at
+
+
+async def set_password_expiry(db: Session, user: User, days: int = 90) -> None:
+    """
+    Set password expiry date for a user.
+    
+    Args:
+        db: Database session
+        user: User object
+        days: Number of days until password expires (default: 90)
+    """
+    user.password_expires_at = datetime.now(timezone.utc) + timedelta(days=days)
+    user.password_changed_at = datetime.now(timezone.utc)
+    
+    db.add(user)
+    await db.commit()
