@@ -43,6 +43,7 @@ from app.core.email import (
     send_account_locked_notification,
 )
 from app.core.password_policy import validate_password_policy
+from app.core.rate_limit import rate_limit_manager
 from app.core.settings import settings
 from app.src.models.users import User
 from app.src.schema.auth import (
@@ -141,6 +142,9 @@ async def login(
     session: SessionDep,
     remember_me: bool = False,
 ):
+    # Apply rate limiting for login attempts
+    rate_limit_manager.check_authentication_rate_limit(request, "login")
+    
     user = await get_user(session, form_data.username)
     
     # Check if account is locked BEFORE password verification (security best practice)
@@ -430,7 +434,10 @@ async def get_token(
 
 
 @router.post("/register", response_model=User)
-async def register_user(user: User, session: SessionDep):
+async def register_user(user: User, request: Request, session: SessionDep):
+    # Apply rate limiting for registration attempts
+    rate_limit_manager.check_authentication_rate_limit(request, "register")
+    
     if not user or not user.username or not user.password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -835,7 +842,7 @@ async def request_password_reset(
     Security Features:
     - Does not reveal if user exists (prevents user enumeration)
     - Secure token generation with 1-hour expiry
-    - Rate limiting should be implemented at infrastructure level
+    - Rate limiting to prevent abuse
     
     Args:
         data: Password reset request (email or username)
@@ -845,6 +852,9 @@ async def request_password_reset(
     Returns:
         Standardized response regardless of user existence
     """
+    # Apply rate limiting for password reset attempts
+    rate_limit_manager.check_authentication_rate_limit(request, "password_reset")
+    
     user = None
     
     # Find user by email or username (timing-safe approach)
@@ -902,6 +912,9 @@ async def confirm_password_reset(
     Returns:
         Password change confirmation
     """
+    # Apply rate limiting for password reset confirmation attempts
+    rate_limit_manager.check_authentication_rate_limit(request, "password_reset")
+    
     # Validate password confirmation
     if data.new_password != data.confirm_password:
         raise HTTPException(
@@ -971,6 +984,9 @@ async def change_password(
     Returns:
         Password change confirmation
     """
+    # Apply rate limiting for password change attempts
+    rate_limit_manager.check_authentication_rate_limit(request, "password_change")
+    
     # Verify current password
     if not verify_password(data.current_password, current_user.password):
         # Increment failed attempts for security

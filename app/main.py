@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 from app.core.database import SessionDep, init_db
+from app.core.rate_limit import setup_rate_limiting, cleanup_rate_limiting
+from app.core.security_headers import setup_security_headers
 from app.src.jobs.fines_scheduler import start_scheduler, stop_scheduler
 from app.src.routes import auth, circulation, fines, items, users
 
@@ -39,9 +41,16 @@ async def lifespan(app: FastAPI):
     # Shutdown code
     print("Shutting down...")
     stop_scheduler()
+    cleanup_rate_limiting()
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Setup rate limiting middleware
+setup_rate_limiting(app)
+
+# Setup security headers middleware
+setup_security_headers(app)
 
 
 # UserStatusException handler removed - now using secure generic error responses

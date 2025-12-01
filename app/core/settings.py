@@ -64,10 +64,29 @@ class Settings(BaseSettings):
     
     # Rate Limiting Configuration
     rate_limit_enabled: bool = True
-    rate_limit_login_per_minute: int = 5  # Login attempts per IP per minute
-    rate_limit_register_per_hour: int = 3  # Registration attempts per IP per hour
-    rate_limit_password_reset_per_hour: int = 3  # Password reset requests per IP per hour
-    rate_limit_general_per_minute: int = 60  # General API requests per minute
+    
+    # Authentication endpoint rate limits (per IP)
+    LOGIN_RATE_LIMIT_PER_IP: int = 5  # Login attempts per IP
+    LOGIN_RATE_LIMIT_WINDOW: int = 300  # 5 minutes in seconds
+    
+    REGISTER_RATE_LIMIT_PER_IP: int = 3  # Registration attempts per IP
+    REGISTER_RATE_LIMIT_WINDOW: int = 3600  # 1 hour in seconds
+    
+    PASSWORD_RESET_RATE_LIMIT_PER_IP: int = 3  # Password reset requests per IP
+    PASSWORD_RESET_RATE_LIMIT_WINDOW: int = 3600  # 1 hour in seconds
+    
+    PASSWORD_CHANGE_RATE_LIMIT_PER_IP: int = 5  # Password change attempts per IP
+    PASSWORD_CHANGE_RATE_LIMIT_WINDOW: int = 900  # 15 minutes in seconds
+    
+    DEFAULT_AUTH_RATE_LIMIT_PER_IP: int = 10  # Default auth attempts per IP
+    DEFAULT_AUTH_RATE_LIMIT_WINDOW: int = 600  # 10 minutes in seconds
+    
+    # User-based rate limits (authenticated users)
+    USER_RATE_LIMIT_PER_USER: int = 100  # Requests per user
+    USER_RATE_LIMIT_WINDOW: int = 3600  # 1 hour in seconds
+    
+    # Redis URL for distributed rate limiting (optional)
+    REDIS_URL: str = "redis://localhost:6379/0"
     
     # Session Security
     session_timeout_minutes: int = 30  # Auto-logout after inactivity
