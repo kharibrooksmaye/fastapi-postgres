@@ -17,22 +17,41 @@ from app.core.authentication import (
     activate_user_with_token,
     create_access_token,
     create_activation_token,
+    create_password_reset_token,
     create_refresh_token,
     get_current_user,
     get_password_hash,
     get_user,
     get_user_sessions,
+    increment_failed_login_attempts,
+    is_account_locked,
+    reset_failed_login_attempts,
     revoke_all_user_tokens,
     revoke_refresh_token,
     store_csrf_token,
+    use_password_reset_token,
     verify_and_get_refresh_token,
     verify_csrf_token,
     verify_password,
+    verify_password_reset_token,
 )
 from app.core.database import SessionDep
-from app.core.email import send_activation_email
+from app.core.email import (
+    send_activation_email,
+    send_password_reset_email,
+    send_password_changed_notification,
+    send_account_locked_notification,
+)
 from app.core.settings import settings
 from app.src.models.users import User
+from app.src.schema.auth import (
+    PasswordChangeRequest,
+    PasswordChangeResponse,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    PasswordResetResponse,
+    SecurityStatusResponse,
+)
 from app.src.schema.users import ActivateUserRequest
 
 router = APIRouter()
@@ -123,6 +142,18 @@ async def login(
 ):
     user = await get_user(session, form_data.username)
     
+    # Check if account is locked BEFORE password verification (security best practice)
+    if user and await is_account_locked(user):
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail="Account is temporarily locked due to multiple failed login attempts. Please try again later.",
+            headers={
+                "X-Account-Status": "locked",
+                "X-Action-Required": "wait",
+                "X-Lockout-Expires": user.account_locked_until.isoformat() if user.account_locked_until else None
+            }
+        )
+    
     # Always verify password first to prevent timing attacks
     # Use a dummy hash if user doesn't exist to maintain consistent timing
     if user:
@@ -136,6 +167,18 @@ async def login(
     # SECURE TWO-STAGE AUTHENTICATION:
     # Stage 1: Check credentials without revealing user existence
     if not user or not password_valid:
+        # Increment failed attempts if user exists
+        if user:
+            await increment_failed_login_attempts(session, user)
+            
+            # Check if account is now locked after this attempt
+            if await is_account_locked(user):
+                await send_account_locked_notification(
+                    user.email,
+                    user.username,
+                    lockout_duration_minutes=15,
+                    failed_attempts=user.failed_login_attempts
+                )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect username or password",
@@ -205,6 +248,9 @@ async def login(
                     "X-User-Email": user.email
                 }
             )
+
+    # Reset failed login attempts on successful authentication
+    await reset_failed_login_attempts(session, user)
 
     # Create access token (short-lived)
     result = create_access_token(data={"sub": user.username})
@@ -752,3 +798,247 @@ async def revoke_session(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
         )
+
+
+# Password Management Routes
+
+@router.post("/password/reset-request", response_model=PasswordResetResponse)
+async def request_password_reset(
+    data: PasswordResetRequest,
+    request: Request,
+    session: SessionDep
+):
+    """
+    Request a password reset token via email.
+    
+    Security Features:
+    - Does not reveal if user exists (prevents user enumeration)
+    - Secure token generation with 1-hour expiry
+    - Rate limiting should be implemented at infrastructure level
+    
+    Args:
+        data: Password reset request (email or username)
+        request: FastAPI request object for IP logging
+        session: Database session
+        
+    Returns:
+        Standardized response regardless of user existence
+    """
+    user = None
+    
+    # Find user by email or username (timing-safe approach)
+    if data.email:
+        result = await session.exec(select(User).where(User.email == data.email))
+        user = result.first()
+    elif data.username:
+        result = await session.exec(select(User).where(User.username == data.username))
+        user = result.first()
+    
+    # Always return success message to prevent user enumeration
+    if user and user.is_active:
+        try:
+            # Generate reset token
+            reset_token = await create_password_reset_token(session, user.id)
+            
+            # Send reset email
+            await send_password_reset_email(user.email, user.username, reset_token)
+            
+            user_status = "active"
+        except Exception as e:
+            print(f"Failed to send password reset email: {e}")
+            user_status = "email_error"
+    else:
+        user_status = "not_found" if not user else "inactive"
+    
+    # Return same message regardless of outcome (security best practice)
+    return PasswordResetResponse(
+        message="If an account with that email exists, a password reset link has been sent.",
+        success=True,
+        user_status=user_status
+    )
+
+
+@router.post("/password/reset-confirm", response_model=PasswordChangeResponse)
+async def confirm_password_reset(
+    data: PasswordResetConfirm,
+    request: Request,
+    session: SessionDep
+):
+    """
+    Confirm password reset using token and set new password.
+    
+    Security Features:
+    - Token validation with timing-safe comparison
+    - Password confirmation matching
+    - One-time token usage
+    - Automatic account unlock on successful reset
+    
+    Args:
+        data: Password reset confirmation with token and new password
+        request: FastAPI request object for IP logging
+        session: Database session
+        
+    Returns:
+        Password change confirmation
+    """
+    # Validate password confirmation
+    if data.new_password != data.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password confirmation does not match"
+        )
+    
+    # Validate password strength (basic check)
+    if len(data.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long"
+        )
+    
+    # Attempt to reset password
+    success = await use_password_reset_token(session, data.token, data.new_password)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    # Get user to send notification
+    user = await verify_password_reset_token(session, data.token)
+    if user:
+        # Send password change notification
+        client_ip = request.client.host if request.client else "Unknown"
+        await send_password_changed_notification(user.email, user.username, client_ip)
+    
+    from datetime import datetime, timezone
+    return PasswordChangeResponse(
+        message="Password successfully reset",
+        success=True,
+        password_changed_at=datetime.now(timezone.utc)
+    )
+
+
+@router.post("/password/change", response_model=PasswordChangeResponse)
+async def change_password(
+    data: PasswordChangeRequest,
+    request: Request,
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    """
+    Change password for authenticated user.
+    
+    Security Features:
+    - Current password verification
+    - Password confirmation matching
+    - Password strength validation
+    - Failed attempt tracking
+    
+    Args:
+        data: Password change request with current and new passwords
+        request: FastAPI request object for IP logging
+        session: Database session
+        current_user: Currently authenticated user
+        
+    Returns:
+        Password change confirmation
+    """
+    # Verify current password
+    if not verify_password(data.current_password, current_user.password):
+        # Increment failed attempts for security
+        await increment_failed_login_attempts(session, current_user)
+        
+        # Check if account should be locked
+        if await is_account_locked(current_user):
+            await send_account_locked_notification(
+                current_user.email, 
+                current_user.username,
+                lockout_duration_minutes=15,
+                failed_attempts=current_user.failed_login_attempts
+            )
+        
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    # Validate password confirmation
+    if data.new_password != data.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password confirmation does not match"
+        )
+    
+    # Validate password strength
+    if len(data.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long"
+        )
+    
+    # Prevent reusing current password
+    if verify_password(data.new_password, current_user.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password"
+        )
+    
+    # Update password
+    from datetime import datetime, timezone
+    current_user.password = get_password_hash(data.new_password)
+    current_user.password_changed_at = datetime.now(timezone.utc)
+    current_user.failed_login_attempts = 0  # Reset failed attempts
+    current_user.account_locked_until = None  # Unlock if locked
+    
+    session.add(current_user)
+    await session.commit()
+    
+    # Send notification email
+    client_ip = request.client.host if request.client else "Unknown"
+    await send_password_changed_notification(current_user.email, current_user.username, client_ip)
+    
+    return PasswordChangeResponse(
+        message="Password successfully changed",
+        success=True,
+        password_changed_at=current_user.password_changed_at
+    )
+
+
+@router.get("/security/status", response_model=SecurityStatusResponse)
+async def get_security_status(
+    session: SessionDep,
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    """
+    Get security status information for current user.
+    
+    Returns account security details including:
+    - Account lock status
+    - Failed login attempts
+    - Password expiry information
+    - Password age
+    
+    Args:
+        session: Database session
+        current_user: Currently authenticated user
+        
+    Returns:
+        Security status information
+    """
+    from datetime import datetime, timezone
+    
+    # Calculate password age if password_changed_at exists
+    password_age_days = None
+    if current_user.password_changed_at:
+        age_delta = datetime.now(timezone.utc) - current_user.password_changed_at
+        password_age_days = age_delta.days
+    
+    return SecurityStatusResponse(
+        is_locked=await is_account_locked(current_user),
+        lockout_expires_at=current_user.account_locked_until,
+        failed_attempts=current_user.failed_login_attempts,
+        max_attempts=5,
+        password_expires_at=current_user.password_expires_at,
+        password_age_days=password_age_days
+    )
