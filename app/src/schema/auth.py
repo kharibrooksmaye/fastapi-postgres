@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Union
+from typing import Optional, Union
 from pydantic import BaseModel, Field
 
 
@@ -266,5 +266,45 @@ class ForgotPasswordResponse(BaseModel):
             "example": {
                 "message": "If an account with that email exists, a password reset link has been sent.",
                 "success": True
+            }
+        }
+
+
+class VerifyResetTokenRequest(BaseModel):
+    """Request to verify password reset token validity."""
+    token: str = Field(
+        ..., 
+        description="Password reset token to validate",
+        min_length=1,
+        example="abcd1234-ef56-7890-ghij-klmnopqrstuv"
+    )
+
+
+class VerifyResetTokenResponse(BaseModel):
+    """Response for password reset token verification."""
+    valid: bool = Field(
+        ...,
+        description="Whether the token is valid and unexpired"
+    )
+    message: str = Field(
+        ...,
+        description="Human-readable status message"
+    )
+    expires_at: Optional[datetime] = Field(
+        None,
+        description="Token expiration timestamp (only if valid)"
+    )
+    user_email: Optional[str] = Field(
+        None,
+        description="Email associated with valid token (masked for privacy)"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "valid": True,
+                "message": "Password reset token is valid and ready to use.",
+                "expires_at": "2025-12-01T20:30:00Z",
+                "user_email": "jo***@example.com"
             }
         }

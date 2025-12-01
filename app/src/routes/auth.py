@@ -55,6 +55,8 @@ from app.src.schema.auth import (
     PasswordResetRequest,
     PasswordResetResponse,
     SecurityStatusResponse,
+    VerifyResetTokenRequest,
+    VerifyResetTokenResponse,
 )
 from app.src.schema.users import ActivateUserRequest
 
@@ -1169,3 +1171,71 @@ async def forgot_password(
         message="If an account with that email exists, a password reset link has been sent.",
         success=True
     )
+
+
+@router.post("/verify-reset-token", response_model=VerifyResetTokenResponse)
+async def verify_reset_token(
+    request: VerifyResetTokenRequest,
+    session: SessionDep,
+    http_request: Request
+) -> VerifyResetTokenResponse:
+    """
+    Verify password reset token validity without consuming it.
+    
+    Provides immediate feedback on token validity for better user experience.
+    Useful for frontend applications to validate tokens before showing reset forms.
+    
+    Features:
+    - Non-destructive token validation (doesn't consume the token)
+    - Rate limiting protection against token enumeration attacks
+    - Timing-safe token comparison for security
+    - Detailed validation response with expiration info
+    - Privacy-conscious email masking
+    
+    Args:
+        request: Password reset token to validate
+        session: Database session
+        http_request: HTTP request for rate limiting
+    
+    Returns:
+        Token validation result with status and metadata
+    
+    Raises:
+        HTTPException: 429 if rate limit exceeded
+    """
+    # Apply rate limiting for token verification (more permissive than reset requests)
+    rate_limit_manager.check_authentication_rate_limit(http_request, "verify_token")
+    
+    try:
+        # Verify token using existing authentication function
+        user = await verify_password_reset_token(session, request.token)
+        
+        if user:
+            # Token is valid - provide success response with metadata
+            # Mask email for privacy (show first 2 chars + domain)
+            email_parts = user.email.split('@')
+            masked_email = f"{email_parts[0][:2]}***@{email_parts[1]}" if len(email_parts) == 2 else "***@***.com"
+            
+            return VerifyResetTokenResponse(
+                valid=True,
+                message="Password reset token is valid and ready to use.",
+                expires_at=user.password_reset_expires,
+                user_email=masked_email
+            )
+        else:
+            # Token is invalid or expired
+            return VerifyResetTokenResponse(
+                valid=False,
+                message="Password reset token is invalid or has expired. Please request a new password reset.",
+                expires_at=None,
+                user_email=None
+            )
+            
+    except Exception:
+        # Return invalid status on any error to maintain security
+        return VerifyResetTokenResponse(
+            valid=False,
+            message="Unable to verify token. Please try again or request a new password reset.",
+            expires_at=None,
+            user_email=None
+        )

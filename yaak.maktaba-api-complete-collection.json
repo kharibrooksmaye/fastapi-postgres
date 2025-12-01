@@ -395,6 +395,34 @@
       },
       {
         "model": "http_request",
+        "id": "rq_auth_verify_reset_token",
+        "createdAt": "2025-12-01T00:00:00",
+        "updatedAt": "2025-12-01T00:00:00",
+        "workspaceId": "wk_maktaba_complete",
+        "folderId": "fl_password_management",
+        "authentication": {},
+        "authenticationType": null,
+        "body": {
+          "json": "{\n  \"token\": \"${[ reset_token ]}\"\n}"
+        },
+        "bodyType": "application/json",
+        "description": "Verify password reset token validity without consuming it.\n\nProvides immediate feedback on token status for better UX.\n\nFeatures:\n- Non-destructive validation (token remains usable)\n- Returns expiration info and masked email\n- Rate limited to prevent token enumeration\n- Ideal for frontend validation before showing reset forms\n\nResponse includes token validity, expiration timestamp, and privacy-masked email.",
+        "headers": [
+          {
+            "enabled": true,
+            "name": "Content-Type",
+            "value": "application/json",
+            "id": "verify_token_content_type"
+          }
+        ],
+        "method": "POST",
+        "name": "Verify Reset Token",
+        "sortPriority": -1008000.0,
+        "url": "${[ backend_url ]}/auth/verify-reset-token",
+        "urlParameters": []
+      },
+      {
+        "model": "http_request",
         "id": "rq_auth_password_reset_confirm",
         "createdAt": "2025-11-30T00:00:00",
         "updatedAt": "2025-11-30T00:00:00",
