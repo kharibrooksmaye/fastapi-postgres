@@ -47,6 +47,8 @@ from app.core.rate_limit import rate_limit_manager
 from app.core.settings import settings
 from app.src.models.users import User
 from app.src.schema.auth import (
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     PasswordChangeRequest,
     PasswordChangeResponse,
     PasswordResetConfirm,
@@ -1101,4 +1103,69 @@ async def get_security_status(
         max_attempts=5,
         password_expires_at=current_user.password_expires_at,
         password_age_days=password_age_days
+    )
+
+
+# Simplified Password Reset Endpoints (User-Friendly Aliases)
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    request: Request,
+    session: SessionDep
+):
+    """
+    Simplified password reset request using email only (user-friendly alias).
+    
+    This endpoint provides a simplified, consumer-friendly alternative to
+    /password/reset-request. It only accepts email addresses, making it
+    ideal for consumer applications where the UX should be simple.
+    
+    Security Features:
+    - Same security as /password/reset-request
+    - Does not reveal if user exists (prevents user enumeration)
+    - Secure token generation with 1-hour expiry
+    - Rate limiting to prevent abuse
+    - Email-only input for simplified UX
+    
+    Args:
+        data: Forgot password request with email only
+        request: FastAPI request object for IP logging
+        session: Database session
+        
+    Returns:
+        Standardized success response regardless of user existence
+    """
+    # Apply rate limiting for password reset attempts
+    rate_limit_manager.check_authentication_rate_limit(request, "password_reset")
+    
+    user = None
+    
+    # Find user by email (timing-safe approach)
+    result = await session.exec(select(User).where(User.email == data.email))
+    user = result.first()
+    
+    # Always return success message to prevent user enumeration
+    if user and user.is_active:
+        try:
+            # Generate reset token using the existing function
+            reset_token = await create_password_reset_token(session, user.id)
+            
+            # Send reset email using the existing function
+            await send_password_reset_email(
+                user.email,
+                user.username,
+                reset_token,
+                user_id=user.id
+            )
+            
+        except Exception:
+            # Still return success to prevent user enumeration
+            # Error already logged in send_password_reset_email
+            pass
+    
+    # Always return the same response regardless of user existence
+    return ForgotPasswordResponse(
+        message="If an account with that email exists, a password reset link has been sent.",
+        success=True
     )

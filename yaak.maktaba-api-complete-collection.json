@@ -367,6 +367,34 @@
       },
       {
         "model": "http_request",
+        "id": "rq_auth_forgot_password_simple",
+        "createdAt": "2025-12-01T00:00:00",
+        "updatedAt": "2025-12-01T00:00:00",
+        "workspaceId": "wk_maktaba_complete",
+        "folderId": "fl_password_management",
+        "authentication": {},
+        "authenticationType": null,
+        "body": {
+          "text": "{\n  \"email\": \"user@example.com\"\n}",
+          "mimeType": "application/json"
+        },
+        "bodyType": "text",
+        "description": "Simplified password reset using email only (user-friendly alias).\n\nSame functionality as Password Reset Request but with simplified email-only input.\n\nIdeal for consumer applications with simple UX requirements.\n\nSecurity: Always returns success message to prevent user enumeration.",
+        "headers": [
+          {
+            "id": "forgot_password_simple_content_type",
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "method": "POST",
+        "name": "Forgot Password (Simple)",
+        "sortPriority": -1007500.0,
+        "url": "${[ backend_url ]}/auth/forgot-password",
+        "urlParameters": []
+      },
+      {
+        "model": "http_request",
         "id": "rq_auth_password_reset_confirm",
         "createdAt": "2025-11-30T00:00:00",
         "updatedAt": "2025-11-30T00:00:00",
@@ -392,6 +420,31 @@
         "sortPriority": -1009000.0,
         "url": "${[ backend_url ]}/auth/password/reset-confirm",
         "urlParameters": []
+      },
+      {
+        "model": "http_request",
+        "id": "rq_auth_password_reset_form",
+        "createdAt": "2025-11-30T00:00:00",
+        "updatedAt": "2025-11-30T00:00:00",
+        "workspaceId": "wk_maktaba_complete",
+        "folderId": "fl_password_management",
+        "authentication": {},
+        "authenticationType": null,
+        "body": {},
+        "bodyType": null,
+        "description": "Validate password reset token from email link (GET method).\n\nThis endpoint handles GET requests when users click reset links in their email.\n\nValidates the token and returns form information for password reset.\n\nReturns token validity status, expiration info, and form action details.",
+        "headers": [],
+        "method": "GET",
+        "name": "Password Reset Form (GET)",
+        "sortPriority": -1008500.0,
+        "url": "${[ backend_url ]}/auth/password/reset-confirm?token=reset_token_from_email",
+        "urlParameters": [
+          {
+            "id": "reset_token_param",
+            "name": "token",
+            "value": "reset_token_from_email"
+          }
+        ]
       },
       {
         "model": "http_request",

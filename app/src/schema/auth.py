@@ -240,3 +240,31 @@ class LogoutResponse(BaseModel):
                 "logged_out_at": "2025-11-30T19:30:00Z"
             }
         }
+
+
+# Simplified Password Reset Schemas (User-Friendly Aliases)
+
+class ForgotPasswordRequest(BaseModel):
+    """Schema for simplified forgot password requests (email-only)"""
+    email: str = Field(..., description="Email address associated with the account")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "user@example.com"
+            }
+        }
+
+
+class ForgotPasswordResponse(BaseModel):
+    """Response schema for forgot password request"""
+    message: str
+    success: bool
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "message": "If an account with that email exists, a password reset link has been sent.",
+                "success": True
+            }
+        }
