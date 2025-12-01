@@ -42,6 +42,7 @@ from app.core.email import (
     send_password_changed_notification,
     send_account_locked_notification,
 )
+from app.core.password_policy import validate_password_policy
 from app.core.settings import settings
 from app.src.models.users import User
 from app.src.schema.auth import (
@@ -435,11 +436,31 @@ async def register_user(user: User, session: SessionDep):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username and password are required",
         )
+    
     existing_user = await get_user(session, user.username)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already registered",
+        )
+    
+    # Validate password against security policy
+    user_info = {
+        'username': user.username,
+        'email': user.email,
+        'name': user.name
+    }
+    
+    is_valid, errors, score, strength = validate_password_policy(
+        user.password, 
+        user_info=user_info,
+        password_history=None  # No history for new user
+    )
+    
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Password does not meet security requirements: {'; '.join(errors)}"
         )
     try:
         user.password = get_password_hash(user.password)
@@ -888,11 +909,17 @@ async def confirm_password_reset(
             detail="Password confirmation does not match"
         )
     
-    # Validate password strength (basic check)
-    if len(data.new_password) < 8:
+    # Comprehensive password policy validation
+    is_valid, errors, score, strength = validate_password_policy(
+        data.new_password, 
+        user_info=None,  # No user info available during reset
+        password_history=None  # Password history will be checked in use_password_reset_token
+    )
+    
+    if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters long"
+            detail=f"Password does not meet security requirements: {'; '.join(errors)}"
         )
     
     # Attempt to reset password
@@ -913,7 +940,7 @@ async def confirm_password_reset(
     
     from datetime import datetime, timezone
     return PasswordChangeResponse(
-        message="Password successfully reset",
+        message=f"Password successfully reset (Strength: {strength}, Score: {score}/100)",
         success=True,
         password_changed_at=datetime.now(timezone.utc)
     )
@@ -970,18 +997,35 @@ async def change_password(
             detail="Password confirmation does not match"
         )
     
-    # Validate password strength
-    if len(data.new_password) < 8:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters long"
-        )
-    
     # Prevent reusing current password
     if verify_password(data.new_password, current_user.password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="New password must be different from current password"
+        )
+    
+    # Get user information for password policy validation
+    user_info = {
+        'username': current_user.username,
+        'email': current_user.email,
+        'name': current_user.name
+    }
+    
+    # TODO: Implement password history retrieval
+    # For now, we'll use current password as history
+    password_history = [current_user.password] if current_user.password else []
+    
+    # Comprehensive password policy validation
+    is_valid, errors, score, strength = validate_password_policy(
+        data.new_password, 
+        user_info=user_info,
+        password_history=password_history
+    )
+    
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Password does not meet security requirements: {'; '.join(errors)}"
         )
     
     # Update password
@@ -999,7 +1043,7 @@ async def change_password(
     await send_password_changed_notification(current_user.email, current_user.username, client_ip)
     
     return PasswordChangeResponse(
-        message="Password successfully changed",
+        message=f"Password successfully changed (Strength: {strength}, Score: {score}/100)",
         success=True,
         password_changed_at=current_user.password_changed_at
     )
