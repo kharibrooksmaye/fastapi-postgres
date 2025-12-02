@@ -1152,18 +1152,21 @@ async def forgot_password(
         try:
             # Generate reset token using the existing function
             reset_token = await create_password_reset_token(session, user.id)
+            print(f"Generated reset token for user {user.email}")
             
             # Send reset email using the existing function
             await send_password_reset_email(
                 user.email,
                 user.username,
-                reset_token,
-                user_id=user.id
+                reset_token
             )
+            print(f"Password reset email process completed for {user.email}")
             
-        except Exception:
-            # Still return success to prevent user enumeration
-            # Error already logged in send_password_reset_email
+        except Exception as e:
+            # Log the error for debugging but don't expose it to prevent user enumeration
+            print(f"Error in forgot-password for {user.email}: {str(e)}")
+            import traceback
+            print(f"Full traceback: {traceback.format_exc()}")
             pass
     
     # Always return the same response regardless of user existence

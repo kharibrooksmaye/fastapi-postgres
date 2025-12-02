@@ -85,8 +85,8 @@ class Settings(BaseSettings):
     USER_RATE_LIMIT_PER_USER: int = 100  # Requests per user
     USER_RATE_LIMIT_WINDOW: int = 3600  # 1 hour in seconds
     
-    # Redis URL for distributed rate limiting (optional)
-    REDIS_URL: str = "redis://localhost:6379/0"
+    # Redis URL for distributed rate limiting (optional, falls back to memory)
+    REDIS_URL: Optional[str] = None  # If None, uses in-memory rate limiting
     
     # Session Security
     session_timeout_minutes: int = 30  # Auto-logout after inactivity

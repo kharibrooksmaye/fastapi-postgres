@@ -24,11 +24,10 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from app.core.settings import get_settings
-from app.core.logging import get_logger
+from app.core.settings import settings
+import logging
 
-logger = get_logger(__name__)
-settings = get_settings()
+logger = logging.getLogger(__name__)
 
 # In-memory rate limiting storage (for development/simple deployments)
 _rate_limit_store: Dict[str, deque] = defaultdict(deque)
@@ -53,12 +52,30 @@ def get_user_rate_limit_key(user_id: int, endpoint: str = "") -> str:
     return f"rate_limit:user:general:{user_id}"
 
 
-# Rate limiter instance with Redis backend
-limiter = Limiter(
-    key_func=get_remote_address,
-    storage_uri=settings.REDIS_URL,
-    default_limits=["1000 per day", "100 per hour"]
-)
+# Rate limiter instance with fallback to in-memory storage
+if settings.REDIS_URL:
+    try:
+        # Try to use Redis if URL is provided and available
+        limiter = Limiter(
+            key_func=get_remote_address,
+            storage_uri=settings.REDIS_URL,
+            default_limits=["1000 per day", "100 per hour"]
+        )
+        logger.info(f"Rate limiter initialized with Redis backend: {settings.REDIS_URL}")
+    except Exception as e:
+        # Fallback to in-memory storage if Redis connection fails
+        logger.warning(f"Redis connection failed ({e}), falling back to in-memory rate limiting")
+        limiter = Limiter(
+            key_func=get_remote_address,
+            default_limits=["1000 per day", "100 per hour"]
+        )
+else:
+    # Use in-memory storage by default
+    limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=["1000 per day", "100 per hour"]
+    )
+    logger.info("Rate limiter initialized with in-memory backend")
 
 
 class CustomRateLimitExceeded(RateLimitExceeded):
@@ -69,16 +86,23 @@ class CustomRateLimitExceeded(RateLimitExceeded):
         self.retry_after = retry_after
 
 
-async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+async def rate_limit_exceeded_handler(request: Request, exc):
     """
     Custom handler for rate limit exceeded errors.
     
     Provides detailed error response with security headers.
+    Handles both RateLimitExceeded and connection errors gracefully.
     """
-    logger.warning(
-        f"Rate limit exceeded for {get_remote_address(request)} "
-        f"on {request.url.path}"
-    )
+    client_ip = get_remote_address(request)
+    
+    # Handle different types of exceptions
+    if isinstance(exc, RateLimitExceeded):
+        detail = getattr(exc, 'detail', 'Rate limit exceeded')
+        logger.warning(f"Rate limit exceeded for {client_ip} on {request.url.path}")
+    else:
+        # Handle connection errors or other exceptions
+        detail = "Rate limiting service temporarily unavailable"
+        logger.error(f"Rate limiting error for {client_ip} on {request.url.path}: {exc}")
     
     # Extract retry-after from exception if available
     retry_after = getattr(exc, 'retry_after', 60)
@@ -88,7 +112,7 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
         content={
             "error": "rate_limit_exceeded",
             "message": "Too many requests. Please try again later.",
-            "detail": str(exc.detail),
+            "detail": str(detail),
             "retry_after": retry_after
         }
     )
@@ -320,12 +344,18 @@ def rate_limit(endpoint_type: str = "general"):
 # Middleware setup functions
 def setup_rate_limiting(app):
     """Setup rate limiting middleware for FastAPI app."""
-    # Add SlowAPI middleware
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
-    app.add_middleware(SlowAPIMiddleware)
-    
-    logger.info("Rate limiting middleware configured successfully")
+    try:
+        # Add SlowAPI middleware
+        app.state.limiter = limiter
+        app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+        # Also handle connection errors that might occur with Redis
+        app.add_exception_handler(ConnectionError, rate_limit_exceeded_handler)
+        app.add_middleware(SlowAPIMiddleware)
+        
+        logger.info("Rate limiting middleware configured successfully")
+    except Exception as e:
+        logger.error(f"Failed to setup rate limiting middleware: {e}")
+        logger.info("Application will continue without rate limiting")
 
 
 def cleanup_rate_limiting():
