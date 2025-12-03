@@ -1095,7 +1095,15 @@ async def get_security_status(
     # Calculate password age if password_changed_at exists
     password_age_days = None
     if current_user.password_changed_at:
-        age_delta = datetime.now(timezone.utc) - current_user.password_changed_at
+        # Ensure both datetimes are timezone-aware for comparison
+        current_time = datetime.now(timezone.utc)
+        password_changed_time = current_user.password_changed_at
+        
+        # If password_changed_at is timezone-naive, assume it's UTC
+        if password_changed_time.tzinfo is None:
+            password_changed_time = password_changed_time.replace(tzinfo=timezone.utc)
+        
+        age_delta = current_time - password_changed_time
         password_age_days = age_delta.days
     
     return SecurityStatusResponse(

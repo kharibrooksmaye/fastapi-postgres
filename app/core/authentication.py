@@ -242,24 +242,37 @@ async def verify_and_get_refresh_token(db: Session, token: str):
     # Import here to avoid circular dependency
     from app.src.models.refresh_tokens import RefreshToken
 
-    # Get all non-revoked, non-expired tokens
-    result = await db.exec(
-        select(RefreshToken).where(
-            RefreshToken.is_revoked.is_(False),
-            RefreshToken.expires_at > datetime.now(timezone.utc),
+    try:
+        # Get all non-revoked, non-expired tokens
+        result = await db.exec(
+            select(RefreshToken).where(
+                RefreshToken.is_revoked.is_(False),
+                RefreshToken.expires_at > datetime.now(timezone.utc),
+            )
         )
-    )
-    tokens = result.all()
+        tokens = result.all()
+    except Exception as e:
+        print(f"Error querying refresh tokens: {e}")
+        return None
 
     # Check each token hash
     for token_record in tokens:
         if verify_refresh_token(token, token_record.token_hash):
-            # Update last_used_at
-            token_record.last_used_at = datetime.now(timezone.utc)
-            db.add(token_record)
-            await db.commit()
-            await db.refresh(token_record)
-            return token_record
+            try:
+                # Update last_used_at with proper timezone handling
+                current_time = datetime.now(timezone.utc)
+                token_record.last_used_at = current_time
+                db.add(token_record)
+                await db.commit()
+                await db.refresh(token_record)
+                return token_record
+            except Exception as e:
+                # Log the error but still return the token record
+                # The token is valid even if we can't update the last_used_at timestamp
+                print(f"Warning: Failed to update refresh token last_used_at: {e}")
+                await db.rollback()
+                # Return the token record without the timestamp update
+                return token_record
 
     return None
 
