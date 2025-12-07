@@ -1,0 +1,29 @@
+# Git and version control
+.git
+.gitignore
+
+# Development and testing
+.pytest_cache/
+.coverage
+.env
+.vscode/
+
+# Python cache and build files
+
+__pycache__/
+*.pyc
+.venv/
+
+.gitattributes
+*.md
+htmlcov/
+check_fines.py
+yaak.maktaba-api-complete-collection.json
+supabase/
+AUTHENTICATION_*.md
+AUTH_*.md
+PERSISTENT_*.md
+REFRESH_*.md
+SECURE_*.md
+SECURITY_*.md
+STEP_*.md
