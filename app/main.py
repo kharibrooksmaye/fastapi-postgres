@@ -3,10 +3,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-
 from app.core.database import SessionDep, init_db
 from app.core.rate_limit import setup_rate_limiting, cleanup_rate_limiting
 from app.core.security_headers import setup_security_headers
+from app.core.middleware import setup_middleware
+from app.core.monitoring import router as monitoring_router
+from app.core.logging import app_logger
 from app.src.jobs.fines_scheduler import start_scheduler, stop_scheduler
 from app.src.routes import auth, circulation, fines, items, users
 
@@ -23,7 +25,9 @@ origins = [
 
 
 async def startup() -> SessionDep:
+    app_logger.info("Initializing database connection...")
     await init_db()
+    app_logger.info("Database initialization completed successfully")
     # async with session_context() as session:
     #     print("Custom db actions")
     #     await custom_db_edits(session)
@@ -33,18 +37,33 @@ async def startup() -> SessionDep:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup code
-    print("Starting up...")
-    await startup()
-    start_scheduler()
-    print("DB connected")
-    yield
-    # Shutdown code
-    print("Shutting down...")
-    stop_scheduler()
-    cleanup_rate_limiting()
+    app_logger.info("Application startup initiated")
+    try:
+        await startup()
+        start_scheduler()
+        app_logger.info("Application startup completed successfully")
+        app_logger.info("Services: Database connected, Rate limiting active, Scheduler started")
+        yield
+    except Exception as e:
+        app_logger.error(f"Application startup failed: {str(e)}", exc_info=True)
+        raise
+    finally:
+        # Shutdown code
+        app_logger.info("Application shutdown initiated")
+        stop_scheduler()
+        cleanup_rate_limiting()
+        app_logger.info("Application shutdown completed")
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="Maktabi API",
+    description="Library Management System with Comprehensive Security",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# Setup comprehensive middleware (includes error handling, logging, and security)
+setup_middleware(app)
 
 # Setup rate limiting middleware
 setup_rate_limiting(app)
@@ -65,45 +84,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(circulation.router, prefix="/circulation")
-app.include_router(items.router, prefix="/catalog")
-app.include_router(users.router, prefix="/users")
-app.include_router(auth.router, prefix="/auth")
-app.include_router(fines.router, prefix="/fines")
+# Include monitoring endpoints (health checks, metrics)
+app.include_router(monitoring_router)
+
+# Include application routes
+app.include_router(circulation.router, prefix="/circulation", tags=["circulation"])
+app.include_router(items.router, prefix="/catalog", tags=["catalog"])
+app.include_router(users.router, prefix="/users", tags=["users"])
+app.include_router(auth.router, prefix="/auth", tags=["authentication"])
+app.include_router(fines.router, prefix="/fines", tags=["fines"])
 
 
 @app.get("/")
 async def read_root():
-    return {"Hello": "World"}
-
-# Add these to your main.py:
-
-@app.get("/health")
-async def health_check():
-    """Health check for Docker healthcheck"""
-    from datetime import datetime, timezone
+    """Root endpoint with service information."""
+    from datetime import datetime
     return {
-        "status": "healthy",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "service": "maktaba-api"
+        "service": "Maktabi API",
+        "description": "Library Management System with Enterprise Security",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat(),
+        "status": "operational",
+        "documentation": "/docs",
+        "health_check": "/monitoring/health"
     }
 
-@app.get("/readiness")
-async def readiness_check(session: SessionDep):
-    """Readiness check with database connectivity"""
-    from datetime import datetime, timezone
-    from sqlmodel import select
-    
-    try:
-        await session.exec(select(1))
-        return {
-            "status": "ready",
-            "database": "connected",
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-    except Exception as e:
-        from fastapi import HTTPException
-        raise HTTPException(500, {"status": "not_ready", "error": str(e)})
+# Legacy health endpoints for backward compatibility
+@app.get("/health")
+async def legacy_health_check():
+    """Legacy health check endpoint - redirects to comprehensive monitoring."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/monitoring/health")
+
+@app.get("/readiness")  
+async def legacy_readiness_check():
+    """Legacy readiness check endpoint - redirects to comprehensive monitoring."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/monitoring/health/ready")
 
 
 if __name__ == "__main__":
