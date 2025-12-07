@@ -19,6 +19,8 @@ from app.src.schema.fines import FineWithItem
 from app.src.schema.users import AdminRoleList
 
 
+from app.core.rate_limit import limiter
+
 router = APIRouter()
 
 
@@ -142,7 +144,9 @@ async def delete_all_fines(
 
 
 @router.post("/pay/{fine_id}")
+@limiter.limit("3 per minute")
 async def pay_fine(
+    request: Request,
     fine_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
     admin: Annotated[User, Depends(require_roles(AdminRoleList))],

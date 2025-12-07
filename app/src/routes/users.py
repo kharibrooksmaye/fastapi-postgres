@@ -1,11 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import select
 
 from app.core.authentication import get_current_user, get_password_hash, oauth2_scheme
 from app.core.authorization import require_roles
 from app.core.database import SessionDep
+from app.core.rate_limit import limiter
 from app.src.models.users import User
 from app.src.schema.users import AdminRoleList, UserUpdate, UserProfileUpdate
 
@@ -84,7 +85,9 @@ async def get_user(
 
 
 @router.delete("/{user_id}")
+@limiter.limit("10 per minute")
 async def delete_user(
+    request: Request,
     user_id: int,
     admin: Annotated[User, Depends(require_roles("admin"))],
     token: Annotated[str, Depends(oauth2_scheme)],
@@ -102,7 +105,9 @@ async def delete_user(
 
 
 @router.put("/me/")
+@limiter.limit("5 per minute")
 async def update_my_profile(
+    request: Request,
     user_data: UserProfileUpdate,
     current_user: Annotated[User, Depends(get_current_user)],
     session: SessionDep,
