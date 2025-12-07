@@ -76,6 +76,35 @@ app.include_router(fines.router, prefix="/fines")
 async def read_root():
     return {"Hello": "World"}
 
+# Add these to your main.py:
+
+@app.get("/health")
+async def health_check():
+    """Health check for Docker healthcheck"""
+    from datetime import datetime, timezone
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "service": "maktaba-api"
+    }
+
+@app.get("/readiness")
+async def readiness_check(session: SessionDep):
+    """Readiness check with database connectivity"""
+    from datetime import datetime, timezone
+    from sqlmodel import select
+    
+    try:
+        await session.exec(select(1))
+        return {
+            "status": "ready",
+            "database": "connected",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(500, {"status": "not_ready", "error": str(e)})
+
 
 if __name__ == "__main__":
     import uvicorn
