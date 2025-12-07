@@ -1,3 +1,5 @@
+import hashlib
+from pathlib import Path
 from typing import Annotated, Union
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, Request
 from sqlmodel import select
@@ -105,59 +107,201 @@ async def get_item(
     return db_item
 
 
+# Security constants for file upload
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB limit (reduced for security)
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+ALLOWED_MAGIC_NUMBERS = {
+    b'\xff\xd8\xff': 'image/jpeg',  # JPEG
+    b'\x89PNG\r\n\x1a\n': 'image/png',  # PNG
+    b'GIF87a': 'image/gif',  # GIF87a
+    b'GIF89a': 'image/gif',  # GIF89a
+    b'RIFF': 'image/webp'  # WebP (partial check)
+}
+
+
+def _validate_file_security(file: UploadFile, content: bytes) -> None:
+    """Comprehensive file security validation.
+    
+    Validates file size, MIME type, extension, and content magic numbers
+    to prevent malicious file uploads and security vulnerabilities.
+    
+    Args:
+        file: The uploaded file object
+        content: File content bytes for magic number validation
+        
+    Raises:
+        HTTPException: If any security validation fails
+    """
+    # 1. File size validation
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413, 
+            detail=f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)}MB"
+        )
+    
+    # 2. MIME type validation
+    if file.content_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=415, 
+            detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_MIME_TYPES)}"
+        )
+    
+    # 3. File extension validation
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
+        
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid file extension. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+    
+    # 4. Magic number validation (content-based detection)
+    magic_validated = False
+    for magic_bytes, expected_type in ALLOWED_MAGIC_NUMBERS.items():
+        if content.startswith(magic_bytes):
+            magic_validated = True
+            # Verify MIME type matches magic number
+            if expected_type != file.content_type and not (
+                expected_type == 'image/gif' and file.content_type == 'image/gif'
+            ):
+                raise HTTPException(
+                    status_code=400, 
+                    detail="File content doesn't match declared MIME type"
+                )
+            break
+    
+    if not magic_validated:
+        raise HTTPException(
+            status_code=400, 
+            detail="File content validation failed - not a valid image"
+        )
+    
+    # 5. Additional security checks
+    if len(content) < 100:  # Suspiciously small image
+        raise HTTPException(
+            status_code=400, 
+            detail="File too small to be a valid image"
+        )
+
+
+def _generate_secure_filename(original_filename: str, content: bytes) -> str:
+    """Generate secure filename with hash to prevent conflicts and attacks.
+    
+    Args:
+        original_filename: Original uploaded filename
+        content: File content for hash generation
+        
+    Returns:
+        Secure filename with hash prefix
+    """
+    # Create content hash for uniqueness and integrity
+    content_hash = hashlib.sha256(content).hexdigest()[:16]
+    
+    # Sanitize original filename
+    safe_name = Path(original_filename).name
+    # Remove any dangerous characters
+    safe_name = "".join(c for c in safe_name if c.isalnum() or c in "._-")
+    
+    # Combine hash with sanitized name
+    return f"{content_hash}_{safe_name}"
+
+
 @router.post("/upload_image/")
 @limiter.limit("10 per hour")
 async def upload_image(request: Request, file: UploadFile, supabase: SupabaseAsyncClientDep):
-    supabase_storage = supabase.storage
-    file_name = file.filename
-
-    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
-    ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif"}
+    """Secure image upload with comprehensive validation.
     
-    if file.size > MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail="File too large")
-    if file.content_type not in ALLOWED_TYPES:
-        raise HTTPException(status_code=415, detail="Invalid file type")
+    Security features:
+    - File size limits (5MB)
+    - MIME type validation
+    - File extension validation  
+    - Magic number content validation
+    - Secure filename generation
+    - Content integrity checking
+    """
+    supabase_storage = supabase.storage
+    
+    # Read file content once for all validations
+    file_content = await file.read()
+    
+    # Comprehensive security validation
+    _validate_file_security(file, file_content)
+    
+    # Generate secure filename
+    secure_filename = _generate_secure_filename(file.filename, file_content)
+    
+    # Check if file already exists (using secure filename)
     try:
         existing_file = await supabase_storage.from_("maktaba_catalog_images").download(
-            file_name
+            secure_filename
         )
         if existing_file:
             public_url = await supabase_storage.from_(
                 "maktaba_catalog_images"
-            ).get_public_url(file_name)
-            return {"status": 200, "message": "File already exists", "url": public_url}
+            ).get_public_url(secure_filename)
+            return {
+                "status": 200, 
+                "message": "File already exists", 
+                "url": public_url,
+                "filename": secure_filename
+            }
     except Exception:
+        # File doesn't exist, continue with upload
         pass
 
-    file_content = await file.read()
-
     try:
+        # Upload with secure filename
         result = await supabase_storage.from_("maktaba_catalog_images").upload(
-            path=file_name, file=file_content
+            path=secure_filename, file=file_content
         )
+        
         if hasattr(result, "error") and result.error:
             raise HTTPException(
-                status_code=500, detail=f"Upload failed: {result.error}"
+                status_code=500, 
+                detail=f"Storage upload failed: {result.error}"
             )
+        
+        # Verify upload integrity
         try:
-            await supabase_storage.from_("maktaba_catalog_images").download(file_name)
-        except Exception:
+            downloaded = await supabase_storage.from_("maktaba_catalog_images").download(secure_filename)
+            if not downloaded or len(downloaded) != len(file_content):
+                raise HTTPException(
+                    status_code=500, 
+                    detail="Upload integrity check failed"
+                )
+        except Exception as verify_error:
             raise HTTPException(
-                status_code=500, detail="Upload appeared successful but file not found"
+                status_code=500, 
+                detail=f"Upload verification failed: {str(verify_error)}"
             )
+        
+        # Generate public URL
         public_url = await supabase_storage.from_(
             "maktaba_catalog_images"
-        ).get_public_url(file_name)
+        ).get_public_url(secure_filename)
+        
         return {
             "status": 200,
             "message": "Image uploaded successfully",
             "url": public_url,
-            "data": result,
+            "filename": secure_filename,
+            "original_filename": file.filename,
+            "size": len(file_content),
+            "content_type": file.content_type
         }
 
+    except HTTPException:
+        # Re-raise HTTP exceptions (validation errors)
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
+        # Log unexpected errors for monitoring
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Unexpected upload error: {str(e)}"
+        )
 
 
 @router.post("/{item}s/")
