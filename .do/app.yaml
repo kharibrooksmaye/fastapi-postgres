@@ -1,0 +1,166 @@
+spec:
+  name: maktaba-api
+  region: nyc
+  features:
+    - buildpack-stack=ubuntu-22
+  
+  services:
+    - name: api
+      dockerfile_path: Dockerfile
+      github:
+        repo: kharibrooksmaye/fastapi-postgres
+        branch: main
+        deploy_on_push: true
+      http_port: 8000
+      instance_count: 1
+      instance_size_slug: apps-s-1vcpu-0.5gb
+      health_check:
+        http_path: /monitoring/health
+        initial_delay_seconds: 10
+        period_seconds: 30
+        timeout_seconds: 5
+        success_threshold: 1
+        failure_threshold: 3
+      routes:
+        - path: /
+      envs:
+        - key: ENVIRONMENT
+          value: production
+          scope: RUN_TIME
+        - key: PORT
+          value: "8000"
+          scope: RUN_TIME
+        - key: PYTHONPATH
+          value: /app
+          scope: RUN_TIME
+        # Database - Use DigitalOcean managed database or Supabase
+        - key: DB_URL
+          scope: RUN_TIME
+          type: SECRET
+        - key: DB_ENDPOINT
+          scope: RUN_TIME
+          type: SECRET
+        - key: DB_USER
+          scope: RUN_TIME
+          type: SECRET
+        - key: DB_PW
+          scope: RUN_TIME
+          type: SECRET
+        - key: DB_PORT
+          value: "5432"
+          scope: RUN_TIME
+        - key: DB_NAME
+          scope: RUN_TIME
+          type: SECRET
+        - key: TEST_DB_URL
+          scope: RUN_TIME
+          type: SECRET
+        # Application Security
+        - key: SECRET_KEY
+          scope: RUN_TIME
+          type: SECRET
+        - key: ACCESS_TOKEN_EXPIRE_MINUTES
+          value: "30"
+          scope: RUN_TIME
+        - key: ALGORITHM
+          value: HS256
+          scope: RUN_TIME
+        # Supabase
+        - key: SUPABASE_URL
+          scope: RUN_TIME
+          type: SECRET
+        - key: SUPABASE_KEY
+          scope: RUN_TIME
+          type: SECRET
+        - key: SUPABASE_SERVICE_KEY
+          scope: RUN_TIME
+          type: SECRET
+        # Redis for rate limiting
+        - key: REDIS_URL
+          scope: RUN_TIME
+          type: SECRET
+        # Email Configuration
+        - key: SMTP_HOST
+          value: smtp-relay.brevo.com
+          scope: RUN_TIME
+        - key: SMTP_PORT
+          value: "587"
+          scope: RUN_TIME
+        - key: SMTP_USE_TLS
+          value: "true"
+          scope: RUN_TIME
+        - key: SMTP_USERNAME
+          scope: RUN_TIME
+          type: SECRET
+        - key: SMTP_PASSWORD
+          scope: RUN_TIME
+          type: SECRET
+        - key: SMTP_FROM_EMAIL
+          scope: RUN_TIME
+          type: SECRET
+        # Frontend
+        - key: FRONTEND_URL
+          scope: RUN_TIME
+          type: SECRET
+        # External Services
+        - key: S3_KEYID
+          scope: RUN_TIME
+          type: SECRET
+        - key: S3_SECRET
+          scope: RUN_TIME
+          type: SECRET
+        - key: STRIPE_API_KEY
+          scope: RUN_TIME
+          type: SECRET
+        - key: STRIPE_API_LIVE_KEY
+          scope: RUN_TIME
+          type: SECRET
+        - key: STRIPE_WEBHOOK_SECRET
+          scope: RUN_TIME
+          type: SECRET
+        - key: IMAGE_API_KEY
+          scope: RUN_TIME
+          type: SECRET
+        - key: GOOGLE_CXE
+          scope: RUN_TIME
+          type: SECRET
+
+  # Optional: Add a job for database migrations
+  jobs:
+    - name: migrate
+      dockerfile_path: Dockerfile
+      github:
+        repo: kharibrooksmaye/fastapi-postgres
+        branch: main
+      kind: PRE_DEPLOY
+      instance_count: 1
+      instance_size_slug: apps-s-1vcpu-0.5gb
+      run_command: alembic upgrade head
+      envs:
+        - key: DB_URL
+          scope: RUN_TIME
+          type: SECRET
+        - key: DB_ENDPOINT
+          scope: RUN_TIME
+          type: SECRET
+        - key: DB_USER
+          scope: RUN_TIME
+          type: SECRET
+        - key: DB_PW
+          scope: RUN_TIME
+          type: SECRET
+        - key: DB_PORT
+          value: "5432"
+          scope: RUN_TIME
+        - key: DB_NAME
+          scope: RUN_TIME
+          type: SECRET
+
+  # Optional: DigitalOcean Managed Database
+  # Uncomment if using DO managed database instead of Supabase
+  # databases:
+  #   - name: maktaba-db
+  #     engine: PG
+  #     version: "16"
+  #     size: db-s-1vcpu-1gb
+  #     num_nodes: 1
