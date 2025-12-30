@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.src.models.items import Item
 
@@ -15,8 +15,7 @@ class UserPublic(BaseModel):
     member_id: Optional[str] = None
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FineBase(BaseModel):
@@ -37,8 +36,7 @@ class FineWithItem(FineBase):
     catalog_item: Optional[Item] = None
     user: Optional[UserPublic] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FineCreate(BaseModel):

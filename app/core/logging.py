@@ -12,7 +12,7 @@ import logging.config
 import os
 import sys
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from pathlib import Path
 
@@ -57,8 +57,8 @@ class CustomJSONFormatter(jsonlogger.JsonFormatter):
     def add_fields(self, log_record, record, message_dict):
         super().add_fields(log_record, record, message_dict)
         
-        # Add timestamp in ISO format
-        log_record['timestamp'] = datetime.utcnow().isoformat() + 'Z'
+        # Add timestamp in ISO format (timezone-aware)
+        log_record['timestamp'] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
         
         # Add application context
         log_record['app_name'] = 'maktabi-api'
