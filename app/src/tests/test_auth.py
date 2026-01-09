@@ -9,14 +9,14 @@ def valid_credentials():
 
 @pytest.fixture
 def new_user_data():
-    """Factory for creating new user data"""
+    """Factory for creating new user data with secure password"""
     def _create_user(username="newuser", email="newuser@example.com", member_id="999"):
         return {
-            "name": "New User",
+            "name": "Jane Smith",  # Name that won't conflict with password
             "member_id": member_id,
             "username": username,
             "email": email,
-            "password": "newpassword123",
+            "password": "Xk9$mPq2!wLz",  # Strong password: upper, lower, number, special, no patterns
             "is_active": True,
             "type": "member"
         }

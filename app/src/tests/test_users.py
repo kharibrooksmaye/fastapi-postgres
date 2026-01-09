@@ -13,15 +13,27 @@ def test_authenticated_requests(authenticated_client):
     assert response.status_code == 200
     assert isinstance(response.json()["users"], list)
     
-    response = authenticated_client.delete("/users/1")
+    # Create a new user first (so we can delete it without FK issues)
+    response = authenticated_client.post("/users/", json={
+        "name": "Deletable User",
+        "username": "deletableuser",
+        "email": "deletable@example.com",
+        "password": "Xk9$mPq2!wLz"
+    })
+    assert response.status_code == 200
+    new_user_id = response.json()["user"]["id"]
+    
+    # Now delete the newly created user (no FK constraints)
+    response = authenticated_client.delete(f"/users/{new_user_id}")
     assert response.status_code == 200
     assert "message" in response.json()
     
+    # Create another user for the general create test
     response = authenticated_client.post("/users/", json={
         "name": "Test User",
         "username": "newuser",
         "email": "newuser@example.com",
-        "password": "newpassword"
+        "password": "Xk9$mPq2!wLz"
     })
     assert response.status_code == 200
     assert response.json()["user"]["username"] == "newuser"

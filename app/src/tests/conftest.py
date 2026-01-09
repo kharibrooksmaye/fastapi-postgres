@@ -1,4 +1,9 @@
+import os
 import pytest
+
+# Set testing mode BEFORE importing app to disable rate limiting
+os.environ['TESTING'] = '1'
+
 from fastapi.testclient import TestClient
 from pytest_postgresql import factories
 from sqlalchemy import create_engine
@@ -15,7 +20,16 @@ postgresql_process = factories.postgresql_proc(
 )
 postgresql_session = factories.postgresql("postgresql_process")
 
-client = TestClient(app)
+
+@pytest.fixture(scope="function", autouse=True)
+def reset_app_state():
+    """Reset app state before and after each test to ensure isolation."""
+    # Clear any leftover dependency overrides before the test
+    app.dependency_overrides.clear()
+    yield
+    # Clear dependency overrides after the test
+    app.dependency_overrides.clear()
+
 
 @pytest.fixture(scope="function", autouse=True)
 def create_and_delete_database(postgresql_session):
@@ -48,8 +62,9 @@ def authenticated_client(create_and_delete_database):
     app.dependency_overrides[get_current_user] = override_get_my_info
     app.dependency_overrides[oauth2_scheme] = override_oauth2_scheme
     app.dependency_overrides[get_session] = override_get_session_real
-    yield client
-    app.dependency_overrides.clear()
+    # Create a fresh client for each test
+    with TestClient(app) as test_client:
+        yield test_client
     
 @pytest.fixture
 def unauthenticated_client(create_and_delete_database):
@@ -69,8 +84,9 @@ def unauthenticated_client(create_and_delete_database):
             yield session
     """Client without authentication"""
     app.dependency_overrides[get_session] = override_get_session_real
-    yield client
-    app.dependency_overrides.clear()
+    # Create a fresh client for each test
+    with TestClient(app) as test_client:
+        yield test_client
 
 @pytest.fixture
 async def test_db_session(create_and_delete_database):

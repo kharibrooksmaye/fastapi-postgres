@@ -20,7 +20,7 @@ origins = [
     "http://localhost:8000",
     "http://localhost:3000",
     "http://localhost:5173",
-    "https://maktaba-frontend.onrender.com",
+    "https://maktaba-frontend-ifpsl.ondigitalocean.app",
 ]
 
 
@@ -98,12 +98,12 @@ app.include_router(fines.router, prefix="/fines", tags=["fines"])
 @app.get("/")
 async def read_root():
     """Root endpoint with service information."""
-    from datetime import datetime
+    from datetime import datetime, timezone
     return {
         "service": "Maktabi API",
         "description": "Library Management System with Enterprise Security",
         "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": "operational",
         "documentation": "/docs",
         "health_check": "/monitoring/health"

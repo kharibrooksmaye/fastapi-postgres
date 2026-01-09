@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from pathlib import Path
 
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger.json import JsonFormatter as BaseJsonFormatter
 
 
 class SecurityContextFilter(logging.Filter):
@@ -51,7 +51,7 @@ class PerformanceContextFilter(logging.Filter):
         return True
 
 
-class CustomJSONFormatter(jsonlogger.JsonFormatter):
+class CustomJSONFormatter(BaseJsonFormatter):
     """Custom JSON formatter with security and performance context."""
     
     def add_fields(self, log_record, record, message_dict):

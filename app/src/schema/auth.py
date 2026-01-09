@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # Authentication Schemas
@@ -10,13 +10,14 @@ class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1, description="Username or email")
     password: str = Field(..., min_length=1, description="User password")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "username": "johndoe",
                 "password": "SecurePassword123!"
             }
         }
+    )
 
 
 class LoginResponse(BaseModel):
@@ -27,8 +28,8 @@ class LoginResponse(BaseModel):
     expires_in: int
     user_info: dict
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "refresh_token": "def456abc789...",
@@ -43,18 +44,20 @@ class LoginResponse(BaseModel):
                 }
             }
         }
+    )
 
 
 class TokenRefreshRequest(BaseModel):
     """Schema for token refresh requests"""
     refresh_token: str
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "refresh_token": "def456abc789..."
             }
         }
+    )
 
 
 class TokenRefreshResponse(BaseModel):
@@ -63,26 +66,28 @@ class TokenRefreshResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "token_type": "bearer",
                 "expires_in": 14400
             }
         }
+    )
 
 
 class ActivationRequest(BaseModel):
     """Schema for user activation requests"""
     token: str
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "token": "abc123def456..."
             }
         }
+    )
 
 
 class ActivationResponse(BaseModel):
@@ -91,14 +96,15 @@ class ActivationResponse(BaseModel):
     success: bool
     user_id: Union[int, None] = None
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "message": "Account successfully activated",
                 "success": True,
                 "user_id": 1
             }
         }
+    )
 
 
 # Password Management Schemas (duplicated from users.py for auth module convenience)
@@ -108,12 +114,13 @@ class PasswordResetRequest(BaseModel):
     email: Union[str, None] = None
     username: Union[str, None] = None
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "email": "user@example.com"
             }
         }
+    )
 
 
 class PasswordResetConfirm(BaseModel):
@@ -122,14 +129,15 @@ class PasswordResetConfirm(BaseModel):
     new_password: str = Field(..., min_length=8, description="New password (minimum 8 characters)")
     confirm_password: str = Field(..., min_length=8, description="Confirm new password")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "token": "abc123def456...",
                 "new_password": "NewSecurePassword123!",
                 "confirm_password": "NewSecurePassword123!"
             }
         }
+    )
 
 
 class PasswordChangeRequest(BaseModel):
@@ -138,14 +146,15 @@ class PasswordChangeRequest(BaseModel):
     new_password: str = Field(..., min_length=8, description="New password (minimum 8 characters)")
     confirm_password: str = Field(..., min_length=8, description="Confirm new password")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "current_password": "CurrentPassword123!",
                 "new_password": "NewSecurePassword123!",
                 "confirm_password": "NewSecurePassword123!"
             }
         }
+    )
 
 
 class PasswordResetResponse(BaseModel):
@@ -154,14 +163,15 @@ class PasswordResetResponse(BaseModel):
     success: bool
     user_status: Union[str, None] = None
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "message": "If an account with that email exists, a password reset link has been sent.",
                 "success": True,
                 "user_status": "active"
             }
         }
+    )
 
 
 class PasswordChangeResponse(BaseModel):
@@ -171,8 +181,8 @@ class PasswordChangeResponse(BaseModel):
     password_changed_at: Union[datetime, None] = None
     requires_reauth: bool = False
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "message": "Password successfully changed",
                 "success": True,
@@ -180,6 +190,7 @@ class PasswordChangeResponse(BaseModel):
                 "requires_reauth": False
             }
         }
+    )
 
 
 # Security and Status Schemas
@@ -193,8 +204,8 @@ class SecurityStatusResponse(BaseModel):
     password_expires_at: Union[datetime, None] = None
     password_age_days: Union[int, None] = None
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "is_locked": False,
                 "lockout_expires_at": None,
@@ -204,6 +215,7 @@ class SecurityStatusResponse(BaseModel):
                 "password_age_days": 30
             }
         }
+    )
 
 
 class AuthErrorResponse(BaseModel):
@@ -214,8 +226,8 @@ class AuthErrorResponse(BaseModel):
     action_required: Union[str, None] = None
     retry_after: Union[int, None] = None
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "detail": "Invalid username or password",
                 "error_code": "INVALID_CREDENTIALS",
@@ -224,6 +236,7 @@ class AuthErrorResponse(BaseModel):
                 "retry_after": None
             }
         }
+    )
 
 
 class LogoutResponse(BaseModel):
@@ -232,14 +245,15 @@ class LogoutResponse(BaseModel):
     success: bool
     logged_out_at: datetime
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "message": "Successfully logged out",
                 "success": True,
                 "logged_out_at": "2025-11-30T19:30:00Z"
             }
         }
+    )
 
 
 # Simplified Password Reset Schemas (User-Friendly Aliases)
@@ -248,12 +262,13 @@ class ForgotPasswordRequest(BaseModel):
     """Schema for simplified forgot password requests (email-only)"""
     email: str = Field(..., description="Email address associated with the account")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "email": "user@example.com"
             }
         }
+    )
 
 
 class ForgotPasswordResponse(BaseModel):
@@ -261,13 +276,14 @@ class ForgotPasswordResponse(BaseModel):
     message: str
     success: bool
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "message": "If an account with that email exists, a password reset link has been sent.",
                 "success": True
             }
         }
+    )
 
 
 class VerifyResetTokenRequest(BaseModel):
@@ -276,7 +292,7 @@ class VerifyResetTokenRequest(BaseModel):
         ..., 
         description="Password reset token to validate",
         min_length=1,
-        example="abcd1234-ef56-7890-ghij-klmnopqrstuv"
+        examples=["abcd1234-ef56-7890-ghij-klmnopqrstuv"]
     )
 
 
@@ -299,8 +315,8 @@ class VerifyResetTokenResponse(BaseModel):
         description="Email associated with valid token (masked for privacy)"
     )
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "valid": True,
                 "message": "Password reset token is valid and ready to use.",
@@ -308,3 +324,4 @@ class VerifyResetTokenResponse(BaseModel):
                 "user_email": "jo***@example.com"
             }
         }
+    )

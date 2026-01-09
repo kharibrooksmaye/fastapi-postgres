@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import Union
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class UserTypeEnum(str, Enum):
@@ -62,12 +62,13 @@ class PasswordResetRequest(BaseModel):
     email: Union[str, None] = None
     username: Union[str, None] = None
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "email": "user@example.com"
             }
         }
+    )
 
 
 class PasswordResetConfirm(BaseModel):
@@ -76,14 +77,15 @@ class PasswordResetConfirm(BaseModel):
     new_password: str
     confirm_password: str
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "token": "abc123def456...",
                 "new_password": "NewSecurePassword123!",
                 "confirm_password": "NewSecurePassword123!"
             }
         }
+    )
 
 
 class PasswordChangeRequest(BaseModel):
@@ -92,14 +94,15 @@ class PasswordChangeRequest(BaseModel):
     new_password: str
     confirm_password: str
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "current_password": "CurrentPassword123!",
                 "new_password": "NewSecurePassword123!",
                 "confirm_password": "NewSecurePassword123!"
             }
         }
+    )
 
 
 class PasswordResetResponse(BaseModel):
@@ -108,14 +111,15 @@ class PasswordResetResponse(BaseModel):
     success: bool
     user_status: Union[str, None] = None
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "message": "If an account with that email exists, a password reset link has been sent.",
                 "success": True,
                 "user_status": "active"
             }
         }
+    )
 
 
 class PasswordChangeResponse(BaseModel):
@@ -124,14 +128,15 @@ class PasswordChangeResponse(BaseModel):
     success: bool
     password_changed_at: Union[datetime, None] = None
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "message": "Password successfully changed",
                 "success": True,
                 "password_changed_at": "2025-11-30T19:30:00Z"
             }
         }
+    )
 
 
 class AccountSecurityStatus(BaseModel):
@@ -143,8 +148,8 @@ class AccountSecurityStatus(BaseModel):
     password_changed_at: Union[datetime, None] = None
     last_login_attempt: Union[datetime, None] = None
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "is_locked": False,
                 "failed_login_attempts": 0,
@@ -154,6 +159,7 @@ class AccountSecurityStatus(BaseModel):
                 "last_login_attempt": None
             }
         }
+    )
 
 
 class UserWithSecurity(BaseModel):
@@ -171,8 +177,8 @@ class UserWithSecurity(BaseModel):
     updated_at: Union[datetime, None] = None
     security_status: Union[AccountSecurityStatus, None] = None
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": 1,
                 "type": "patron",
@@ -195,3 +201,23 @@ class UserWithSecurity(BaseModel):
                 }
             }
         }
+    )
+
+
+class VerifyResetTokenResponse(BaseModel):
+    """Response schema for verify-reset-token endpoint"""
+    valid: bool
+    message: str
+    email_hint: Union[str, None] = None
+    expires_in_minutes: Union[int, None] = None
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "valid": True,
+                "message": "Token is valid",
+                "email_hint": "j***@example.com",
+                "expires_in_minutes": 45
+            }
+        }
+    )

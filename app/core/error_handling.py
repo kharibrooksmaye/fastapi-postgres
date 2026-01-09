@@ -6,11 +6,11 @@ and security-focused error management across all API endpoints.
 """
 
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.logging import security_logger, app_logger
 
@@ -49,7 +49,7 @@ class ValidationError(HTTPException):
         self,
         detail: str,
         field_errors: Optional[Dict[str, List[str]]] = None,
-        status_code: int = status.HTTP_422_UNPROCESSABLE_ENTITY
+        status_code: int = status.HTTP_422_UNPROCESSABLE_CONTENT
     ):
         super().__init__(status_code=status_code, detail=detail)
         self.field_errors = field_errors or {}
@@ -72,24 +72,33 @@ class BusinessLogicError(HTTPException):
 
 class StandardErrorResponse(BaseModel):
     """Standardized error response schema."""
+    model_config = ConfigDict(ser_json_timedelta='iso8601')
     
     success: bool = False
     error: str
+    detail: Optional[str] = None  # Alias for 'error' for FastAPI compatibility
     error_code: Optional[str] = None
     details: Optional[Union[str, Dict[str, Any]]] = None
     field_errors: Optional[Dict[str, List[str]]] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     request_id: Optional[str] = None
+    
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Ensure detail mirrors error for FastAPI compatibility
+        if self.detail is None:
+            object.__setattr__(self, 'detail', self.error)
 
 
 class StandardSuccessResponse(BaseModel):
     """Standardized success response schema."""
+    model_config = ConfigDict(ser_json_timedelta='iso8601')
     
     success: bool = True
     message: str
     data: Optional[Union[Dict[str, Any], List[Any]]] = None
     meta: Optional[Dict[str, Any]] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     request_id: Optional[str] = None
 
 
@@ -128,7 +137,7 @@ def create_error_response(
     
     return JSONResponse(
         status_code=status_code,
-        content=response_data.dict()
+        content=response_data.model_dump(mode='json')
     )
 
 
@@ -147,7 +156,7 @@ def create_success_response(
         request_id=request_id
     )
     
-    return response.dict()
+    return response.model_dump(mode='json')
 
 
 def sanitize_error_details(
@@ -285,7 +294,7 @@ def handle_validation_error(
     
     return create_error_response(
         request=request,
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         error="Validation failed",
         error_code="VALIDATION_ERROR",
         field_errors=field_errors

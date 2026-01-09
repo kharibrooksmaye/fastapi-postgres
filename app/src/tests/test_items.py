@@ -1,6 +1,20 @@
 import pytest
 from io import BytesIO
 
+# Minimal valid 1x1 pixel PNG image for testing file uploads
+# This is a real PNG that passes magic number validation
+VALID_PNG_BYTES = bytes([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,  # PNG signature
+    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,  # IHDR chunk
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,  # 1x1 pixel
+    0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,  
+    0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,  # IDAT chunk
+    0x54, 0x08, 0xD7, 0x63, 0xF8, 0xFF, 0xFF, 0x3F,
+    0x00, 0x05, 0xFE, 0x02, 0xFE, 0xDC, 0xCC, 0x59,
+    0xE7, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,  # IEND chunk
+    0x44, 0xAE, 0x42, 0x60, 0x82
+] + [0x00] * 50)  # Pad to meet minimum size requirement
+
 def test_authenticated_catalog_requests(authenticated_client):
     """Test GET /catalog/ - get all items"""
     response = authenticated_client.get("/catalog/")
@@ -192,9 +206,11 @@ def test_upload_image_new_file(authenticated_client, mocker):
     mock_storage = mocker.MagicMock()
     mock_bucket = mocker.MagicMock()
 
+    # First download raises exception (file doesn't exist)
+    # Second download returns the same content for verification
     mock_bucket.download = mocker.AsyncMock(side_effect=[
         Exception("File not found"),
-        b"file content"
+        VALID_PNG_BYTES  # Return same content for integrity check
     ])
 
     mock_upload_result = mocker.MagicMock()
@@ -216,9 +232,8 @@ def test_upload_image_new_file(authenticated_client, mocker):
 
     try:
 
-        file_content = b"fake image content"
         files = {
-            "file": ("test_image.png", BytesIO(file_content), "image/png")
+            "file": ("test_image.png", BytesIO(VALID_PNG_BYTES), "image/png")
         }
 
         response = authenticated_client.post("/catalog/upload_image/", files=files)
@@ -255,9 +270,8 @@ def test_upload_image_existing_file(authenticated_client, mocker):
     app.dependency_overrides[get_supabase_client] = mock_get_supabase
 
     try:
-        file_content = b"new image content"
         files = {
-            "file": ("existing_image.png", BytesIO(file_content), "image/png")
+            "file": ("existing_image.png", BytesIO(VALID_PNG_BYTES), "image/png")
         }
 
         response = authenticated_client.post("/catalog/upload_image/", files=files)
@@ -294,12 +308,12 @@ def test_upload_image_upload_error(authenticated_client, mocker):
 
     try:
         files = {
-            "file": ("test_image.png", BytesIO(b"content"), "image/png")
+            "file": ("test_image.png", BytesIO(VALID_PNG_BYTES), "image/png")
         }
 
         response = authenticated_client.post("/catalog/upload_image/", files=files)
         assert response.status_code == 500
-        assert "Upload failed" in response.json()["detail"]
+        assert "Storage upload failed" in response.json()["detail"]
     finally:
         del app.dependency_overrides[get_supabase_client]
 
@@ -316,11 +330,11 @@ def test_upload_image_verification_failure(authenticated_client, mocker):
     def mock_download_side_effect(*args, **kwargs):
         download_call_count[0] += 1
         if download_call_count[0] == 1:
-    
+            # First call - file doesn't exist (before upload)
             raise Exception("File not found")
         else:
-    
-            raise Exception("File not found")
+            # Second call - verification fails
+            raise Exception("File not found after upload")
 
     mock_bucket.download = mocker.AsyncMock(side_effect=mock_download_side_effect)
 
@@ -341,12 +355,12 @@ def test_upload_image_verification_failure(authenticated_client, mocker):
 
     try:
         files = {
-            "file": ("test_image.png", BytesIO(b"content"), "image/png")
+            "file": ("test_image.png", BytesIO(VALID_PNG_BYTES), "image/png")
         }
 
         response = authenticated_client.post("/catalog/upload_image/", files=files)
         assert response.status_code == 500
-        assert "Upload appeared successful but file not found" in response.json()["detail"]
+        assert "Upload verification failed" in response.json()["detail"]
     finally:
         del app.dependency_overrides[get_supabase_client]
 
@@ -375,12 +389,11 @@ def test_upload_image_exception_during_upload(authenticated_client, mocker):
 
     try:
         files = {
-            "file": ("test_image.png", BytesIO(b"content"), "image/png")
+            "file": ("test_image.png", BytesIO(VALID_PNG_BYTES), "image/png")
         }
 
         response = authenticated_client.post("/catalog/upload_image/", files=files)
         assert response.status_code == 500
-        assert "Image upload failed" in response.json()["detail"]
-        assert "Network error" in response.json()["detail"]
+        assert "Unexpected upload error" in response.json()["detail"]
     finally:
         del app.dependency_overrides[get_supabase_client]

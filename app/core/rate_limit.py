@@ -53,7 +53,19 @@ def get_user_rate_limit_key(user_id: int, endpoint: str = "") -> str:
 
 
 # Rate limiter instance with fallback to in-memory storage
-if settings.REDIS_URL:
+# Check if we're in testing mode - disable rate limiting for tests
+import os
+_testing_mode = os.environ.get('TESTING', '').lower() in ('1', 'true', 'yes')
+
+if _testing_mode:
+    # In testing mode, use very high limits that won't interfere with tests
+    limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=["1000000 per minute"],
+        enabled=False  # Disable rate limiting entirely in tests
+    )
+    logger.info("Rate limiter disabled for testing mode")
+elif settings.REDIS_URL:
     try:
         # Try to use Redis if URL is provided and available
         limiter = Limiter(

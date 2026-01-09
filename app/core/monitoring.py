@@ -8,7 +8,7 @@ and monitoring endpoints for production observability.
 import asyncio
 import psutil
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -57,7 +57,7 @@ async def check_database_health() -> Dict[str, Any]:
             "response_time_ms": round(response_time, 2),
             "database_version": str(db_version) if db_version else "unknown",
             "connection_pool": pool_info,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
     except Exception as e:
@@ -65,7 +65,7 @@ async def check_database_health() -> Dict[str, Any]:
         return {
             "status": HealthStatus.UNHEALTHY,
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
 
@@ -99,7 +99,7 @@ async def check_system_health() -> Dict[str, Any]:
             "memory_percent": memory_percent,
             "disk_percent": disk_percent,
             "load_average": load_avg,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
     except Exception as e:
@@ -107,7 +107,7 @@ async def check_system_health() -> Dict[str, Any]:
         return {
             "status": HealthStatus.UNHEALTHY,
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
 
@@ -134,7 +134,7 @@ async def check_application_health() -> Dict[str, Any]:
             "debug_mode": getattr(app_settings, "DEBUG", False),
             "version": getattr(settings, "VERSION", "1.0.0"),
             "config_issues": config_issues,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
     except Exception as e:
@@ -142,7 +142,7 @@ async def check_application_health() -> Dict[str, Any]:
         return {
             "status": HealthStatus.UNHEALTHY,
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
 
@@ -192,7 +192,7 @@ async def health_check():
         
         response = {
             "status": overall_status,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "checks": {
                 "database": database_health,
                 "system": system_health,
@@ -219,7 +219,7 @@ async def health_check():
         return {
             "status": HealthStatus.UNHEALTHY,
             "error": "Health check system failure",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }, 503
 
 
@@ -243,7 +243,7 @@ async def readiness_check():
         
         return {
             "status": "ready",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
     except HTTPException:
@@ -266,7 +266,7 @@ async def liveness_check():
     """
     try:
         # Basic application liveness check
-        current_time = datetime.utcnow()
+        current_time = datetime.now(timezone.utc)
         
         return {
             "status": "alive",
@@ -321,7 +321,7 @@ async def application_metrics():
         }
         
         return {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "system": {
                 "cpu_percent": cpu_percent,
                 "memory_percent": memory.percent,
@@ -354,7 +354,7 @@ async def service_status():
             "version": getattr(app_settings, "VERSION", "1.0.0"),
             "environment": getattr(app_settings, "ENVIRONMENT", "unknown"),
             "status": "operational",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "build_info": {
                 "python_version": f"{psutil.sys.version_info.major}.{psutil.sys.version_info.minor}.{psutil.sys.version_info.micro}",
                 "platform": psutil.platform.platform()

@@ -8,7 +8,7 @@ across all API endpoints.
 
 import re
 from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from fastapi import HTTPException
 
 
@@ -22,13 +22,14 @@ class SecurityValidationError(HTTPException):
 class BaseSecureModel(BaseModel):
     """Base model with security-focused validation patterns."""
     
-    class Config:
+    model_config = ConfigDict(
         # Prevent extra fields that could be used for injection
-        extra = "forbid"
+        extra="forbid",
         # Strip whitespace from string fields
-        str_strip_whitespace = True
+        str_strip_whitespace=True,
         # Validate assignment (not just initialization)
-        validate_assignment = True
+        validate_assignment=True,
+    )
 
 
 class SecureStringField(str):
