@@ -15,6 +15,16 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.logging import security_logger, app_logger
 
 
+# Compatibility layer for different Starlette versions
+# Newer versions use HTTP_422_UNPROCESSABLE_CONTENT
+# Older versions use HTTP_422_UNPROCESSABLE_ENTITY
+HTTP_422_STATUS = getattr(
+    status,
+    'HTTP_422_UNPROCESSABLE_CONTENT',
+    getattr(status, 'HTTP_422_UNPROCESSABLE_ENTITY', 422)
+)
+
+
 class SecurityError(HTTPException):
     """Security-related HTTP exception with enhanced logging."""
     
@@ -44,12 +54,12 @@ class SecurityError(HTTPException):
 
 class ValidationError(HTTPException):
     """Input validation error with detailed field information."""
-    
+
     def __init__(
         self,
         detail: str,
         field_errors: Optional[Dict[str, List[str]]] = None,
-        status_code: int = status.HTTP_422_UNPROCESSABLE_CONTENT
+        status_code: int = HTTP_422_STATUS
     ):
         super().__init__(status_code=status_code, detail=detail)
         self.field_errors = field_errors or {}
@@ -294,7 +304,7 @@ def handle_validation_error(
     
     return create_error_response(
         request=request,
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        status_code=HTTP_422_STATUS,
         error="Validation failed",
         error_code="VALIDATION_ERROR",
         field_errors=field_errors
