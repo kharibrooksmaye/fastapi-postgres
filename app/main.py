@@ -62,6 +62,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# CORS must be added FIRST to ensure headers are added to all responses
+# Including error responses from exception handlers
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Setup comprehensive middleware (includes error handling, logging, and security)
 setup_middleware(app)
 
@@ -74,15 +84,6 @@ setup_security_headers(app)
 
 # UserStatusException handler removed - now using secure generic error responses
 # to prevent user enumeration attacks
-
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Include monitoring endpoints (health checks, metrics)
 app.include_router(monitoring_router)
